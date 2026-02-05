@@ -463,86 +463,103 @@ const Board: React.FC<BoardProps> = ({ user, signOut }) => {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen  flex flex-col bg-gray-100">
-      {/* Main Header */}
-      <div className="bg-white ">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#72c02c] rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">K</span>
+    <div className="min-h-screen flex flex-col bg-slate-50">
+      {/* ──────────────── Header ──────────────── */}
+      <header className="bg-white border-b border-slate-200 shadow-sm">
+        <div className="max-w-screen-2xl mx-auto px-6">
+          <div className="flex items-center justify-between h-16">
+            {/* Left side - Logo + Email */}
+            <div className="flex items-center gap-3.5">
+              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+                <span className="text-white font-semibold text-lg tracking-tight">K</span>
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-slate-800 tracking-tight">Task Manager</h1>
+                <p className="text-xs text-slate-500 font-medium">{user.email}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Task Manager</h1>
-              <p className="text-sm text-gray-600">{user.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search cards..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#72c02c] focus:border-transparent w-64"
-              />
-            </div>
-            <button
-              onClick={signOut}
-              className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Sign Out</span>
-            </button>
-          </div>
-        </div>
 
-        {/* Horizontal Boards */}
-        <div className="overflow-x-auto  pt-4">
-          <div className="flex space-x-2 pb-2">
-            {boards.map((board) => (
+            {/* Right side - Search + Sign out */}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg 
+                           text-sm focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/60 
+                           outline-none transition-all w-72 shadow-sm hover:shadow"
+                />
+              </div>
+
               <button
-                key={board.id}
-                onClick={() => setSelectedBoard(board)}
-                className={`flex-shrink-0 px-4 py-2 rounded-lg transition-colors hover:border-l-4 hover:border-[#72c02c] ${
-                  selectedBoard?.id === board.id
-                    ? 'bg-green-50 text-[#72c02c] border-l-4 border-[#72c02c]'
-                    : 'hover:bg-gray-50 text-gray-700'
-                }`}
+                onClick={signOut}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 
+                         hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200
+                         border border-transparent hover:border-red-200 active:bg-red-100"
               >
-                <div className="font-medium truncate max-w-[150px]">{board.title}</div>
-                {board.description && (
-                  <div className="text-sm text-gray-500 truncate  max-w-[150px]">
-                    {board.description}
-                  </div>
-                )}
+                <LogOut className="w-4 h-4" />
+                <span>Sign out</span>
               </button>
-            ))}
-            <button
-              onClick={() => setShowCreateBoardModal(true)}
-              className="flex-shrink-0 px-4 py-2 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Board</span>
-            </button>
+            </div>
+          </div>
+
+          {/* Board selector */}
+          <div className="pb-3 -mx-1.5">
+            <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-300 hover:scrollbar-thumb-slate-400">
+              {boards.map((board) => (
+                <button
+                  key={board.id}
+                  onClick={() => setSelectedBoard(board)}
+                  className={`
+                    flex-shrink-0 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
+                    border border-transparent
+                    ${selectedBoard?.id === board.id
+                      ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800 hover:border-slate-200'
+                    }
+                  `}
+                >
+                  <div className="max-w-[160px] truncate">{board.title}</div>
+                  {board.description && (
+                    <div className="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">
+                      {board.description}
+                    </div>
+                  )}
+                </button>
+              ))}
+
+              <button
+                onClick={() => setShowCreateBoardModal(true)}
+                className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium 
+                         text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg 
+                         transition-all duration-200 border border-dashed border-slate-300 
+                         hover:border-blue-300 active:bg-blue-100"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Board</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="flex-1">
+      {/* ──────────────── Main Content ──────────────── */}
+      <main className="flex-1">
         {selectedBoard ? (
           loading ? (
-            <div className="flex-1 p-6">
-              <div className="animate-pulse">
-                <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
-                <div className="flex space-x-6">
+            <div className="p-8">
+              <div className="animate-pulse space-y-8">
+                <div className="h-8 bg-slate-200 rounded w-64"></div>
+                <div className="flex gap-6">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="w-80 bg-gray-100 rounded-lg p-4">
-                      <div className="h-6 bg-gray-200 rounded mb-4"></div>
-                      <div className="space-y-3">
+                    <div key={i} className="w-80 bg-white rounded-xl p-5 shadow-sm">
+                      <div className="h-6 bg-slate-200 rounded mb-5"></div>
+                      <div className="space-y-4">
                         {[...Array(2)].map((_, j) => (
-                          <div key={j} className="h-20 bg-gray-200 rounded"></div>
+                          <div key={j} className="h-24 bg-slate-100 rounded-lg"></div>
                         ))}
                       </div>
                     </div>
@@ -551,14 +568,14 @@ const Board: React.FC<BoardProps> = ({ user, signOut }) => {
               </div>
             </div>
           ) : (
-            <div className="flex-1 p-6">
+            <div className="p-6 md:p-8">
               <DndContext
                 collisionDetection={closestCorners}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 onDragOver={handleDragOver}
               >
-                <div className="flex space-x-3 items-start">
+                <div className="flex gap-4 items-start overflow-x-auto pb-6">
                   <SortableContext items={lists.map((l) => l.id)} strategy={horizontalListSortingStrategy}>
                     {lists.map((list) => (
                       <KanbanList
@@ -573,39 +590,42 @@ const Board: React.FC<BoardProps> = ({ user, signOut }) => {
                       />
                     ))}
                   </SortableContext>
-                  <div className="flex-shrink-0">
-                    <button
-                      onClick={() => setShowCreateListModal(true)}
-                      className="w-80 bg-gray-100 hover:bg-gray-200 text-gray-700 p-4 rounded-lg transition-colors flex items-center justify-center space-x-2 min-h-[120px]"
-                    >
-                      <Plus className="w-5 h-5" />
-                      <span className="font-medium">Add another list</span>
-                    </button>
-                  </div>
+
+                  <button
+                    onClick={() => setShowCreateListModal(true)}
+                    className="flex-shrink-0 w-80 h-[140px] bg-white border-2 border-dashed border-slate-300 
+                             rounded-xl flex items-center justify-center gap-2 text-slate-500 
+                             hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/40 
+                             transition-all duration-200 shadow-sm hover:shadow"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span className="font-medium">Add another list</span>
+                  </button>
                 </div>
               </DndContext>
             </div>
           )
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center mx-auto mb-6">
-                <img src={favicon} alt="logo" />
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-center max-w-md">
+              <div className="w-28 h-28 bg-blue-600 rounded-2xl shadow-md flex items-center justify-center mx-auto mb-8">
+                <span className="text-white text-5xl font-bold tracking-tight">T</span>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome to Task Manager</h2>
-              <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                Select a board from the header to get started, or create a new board to organize your tasks.
+              <h2 className="text-2xl font-semibold text-slate-800 mb-4">Welcome to Task Manager</h2>
+              <p className="text-slate-600 mb-8 leading-relaxed">
+                Select an existing board above or create a new one to start organizing your tasks.
               </p>
               <button
                 onClick={() => setShowCreateBoardModal(true)}
-                className="bg-[#72c02c] hover:bg-[#72c02c] text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium 
+                         shadow-md hover:shadow-lg transition-all duration-200 active:bg-blue-800"
               >
                 Create Your First Board
               </button>
             </div>
           </div>
         )}
-      </div>
+      </main>
 
       <CreateBoardModal
         isOpen={showCreateBoardModal}
