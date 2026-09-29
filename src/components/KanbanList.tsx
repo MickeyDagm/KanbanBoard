@@ -11,8 +11,7 @@ interface KanbanListProps {
   onUpdateList: (listId: string, updates: Partial<List>) => void;
   onDeleteList: (listId: string) => void;
   onCreateCard: (listId: string, title: string) => void;
-  onUpdateCard: (cardId: string, updates: Partial<Card>) => void;
-  onDeleteCard: (cardId: string) => void;
+  onOpenCard: (cardId: string) => void;
 }
 
 const KanbanList: React.FC<KanbanListProps> = ({
@@ -21,8 +20,7 @@ const KanbanList: React.FC<KanbanListProps> = ({
   onUpdateList,
   onDeleteList,
   onCreateCard,
-  onUpdateCard,
-  onDeleteCard,
+  onOpenCard,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(list.title);
@@ -130,12 +128,7 @@ const KanbanList: React.FC<KanbanListProps> = ({
       >
         <SortableContext items={cards.map(c => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
-            <KanbanCard
-              key={card.id}
-              card={card}
-              onUpdate={onUpdateCard}
-              onDelete={onDeleteCard}
-            />
+            <KanbanCard key={card.id} card={card} onOpen={onOpenCard} />
           ))}
         </SortableContext>
       </div>

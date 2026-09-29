@@ -28,7 +28,7 @@ const CreateListModal: React.FC<CreateListModalProps> = ({ isOpen, onClose, onCr
       await onCreateList(title.trim());
       setTitle('');
       onClose();
-    } catch (error) {
+    } catch {
       toast.error('Failed to create list');
     } finally {
       setLoading(false);
