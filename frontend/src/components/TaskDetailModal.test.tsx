@@ -83,6 +83,8 @@ const detail: CardDetail = {
           id: 'u1',
           name: 'Ada',
           avatarColor: '#3b82f6',
+          email: 'ada@example.com',
+          createdAt: '2026-09-01T10:00:00.000Z',
         },
       },
     ],

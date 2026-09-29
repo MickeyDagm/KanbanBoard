@@ -51,8 +51,8 @@ const TableView: React.FC<TableViewProps> = ({ lists, cards, onOpenCard }) => {
   const cell = 'px-3 py-2.5 text-left align-middle';
 
   return (
-    <div data-testid="table-view" className="overflow-x-auto">
-      <table className="w-full text-sm bg-white border border-slate-200 rounded-lg overflow-hidden">
+    <div data-testid="table-view" className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      <table className="min-w-[560px] sm:min-w-[620px] w-full text-sm bg-white border border-slate-200 rounded-lg overflow-hidden">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr>
             {COLUMNS.map((col) => {

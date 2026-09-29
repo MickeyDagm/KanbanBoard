@@ -117,44 +117,46 @@ const CalendarView: React.FC<CalendarViewProps> = ({ cards, onOpenCard, onUpdate
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden">
-          {WEEKDAYS.map((d) => (
-            <div key={d} className="bg-slate-50 px-2 py-1.5 text-[11px] font-semibold uppercase text-slate-500 text-center">
-              {d}
-            </div>
-          ))}
-          {days.map((day) => {
-            const key = dayKey(day);
-            const inMonth = day.getMonth() === anchor.getMonth();
-            const dayCards = byDay.get(key) ?? [];
-            return (
-              <div
-                key={key}
-                data-date={key}
-                data-in-month={inMonth}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => dropOn(e, day)}
-                className={`min-h-[92px] p-1.5 bg-white ${inMonth ? '' : 'bg-slate-50/60'}`}
-              >
-                <span
-                  className={`text-xs font-medium mb-1 block ${
-                    key === todayKey
-                      ? 'text-white bg-blue-600 rounded-full w-5 h-5 text-center leading-5'
-                      : inMonth
-                        ? 'text-slate-600'
-                        : 'text-slate-300'
-                  }`}
-                >
-                  {day.getDate()}
-                </span>
-                <div className="space-y-1">
-                  {dayCards.map((card) => (
-                    <CardChip key={card.id} card={card} onOpen={open} />
-                  ))}
-                </div>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="min-w-[560px] sm:min-w-0 grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden">
+            {WEEKDAYS.map((d) => (
+              <div key={d} className="bg-slate-50 px-2 py-1.5 text-[11px] font-semibold uppercase text-slate-500 text-center">
+                {d}
               </div>
-            );
-          })}
+            ))}
+            {days.map((day) => {
+              const key = dayKey(day);
+              const inMonth = day.getMonth() === anchor.getMonth();
+              const dayCards = byDay.get(key) ?? [];
+              return (
+                <div
+                  key={key}
+                  data-date={key}
+                  data-in-month={inMonth}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => dropOn(e, day)}
+                  className={`min-h-[72px] sm:min-h-[92px] p-1 sm:p-1.5 bg-white ${inMonth ? '' : 'bg-slate-50/60'}`}
+                >
+                  <span
+                    className={`text-xs font-medium mb-1 block ${
+                      key === todayKey
+                        ? 'text-white bg-blue-600 rounded-full w-5 h-5 text-center leading-5'
+                        : inMonth
+                          ? 'text-slate-600'
+                          : 'text-slate-300'
+                    }`}
+                  >
+                    {day.getDate()}
+                  </span>
+                  <div className="space-y-1">
+                    {dayCards.map((card) => (
+                      <CardChip key={card.id} card={card} onOpen={open} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 

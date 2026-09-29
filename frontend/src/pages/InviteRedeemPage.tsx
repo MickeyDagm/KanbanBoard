@@ -38,14 +38,14 @@ const InviteRedeemPage: React.FC = () => {
   });
 
   const wrap = (children: React.ReactNode) => (
-    <div className="flex-1 flex items-center justify-center p-8">
+    <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
       <div className="w-full max-w-md">{children}</div>
     </div>
   );
 
   if (previewQuery.isLoading) {
     return wrap(
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 animate-pulse">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 animate-pulse">
         <div className="h-6 bg-slate-200 rounded w-2/3 mb-4" />
         <div className="h-4 bg-slate-100 rounded w-1/2" />
       </div>
@@ -54,7 +54,7 @@ const InviteRedeemPage: React.FC = () => {
 
   if (previewQuery.isError || !previewQuery.data) {
     return wrap(
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 text-center">
         <h1 className="text-xl font-semibold text-slate-800 mb-2">Invite not found</h1>
         <p className="text-slate-600 mb-6">This invite link is invalid or no longer available.</p>
         <Link to="/" className="text-blue-600 hover:underline font-medium">
@@ -73,7 +73,7 @@ const InviteRedeemPage: React.FC = () => {
       maxed: 'This invite has reached its usage limit.',
     };
     return wrap(
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 text-center">
         <h1 className="text-xl font-semibold text-slate-800 mb-2">Invite unavailable</h1>
         <p className="text-slate-600 mb-6">{reasons[preview.status] ?? 'This invite is not active.'}</p>
         <Link to="/" className="text-blue-600 hover:underline font-medium">
@@ -85,7 +85,7 @@ const InviteRedeemPage: React.FC = () => {
 
   if (preview.alreadyMember) {
     return wrap(
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 text-center">
         <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Users className="w-6 h-6 text-blue-600" />
         </div>
@@ -95,7 +95,7 @@ const InviteRedeemPage: React.FC = () => {
         <p className="text-slate-600 mb-6">Your account already has access to this team.</p>
         <Link
           to={`/teams/${preview.team.id}`}
-          className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium shadow-sm"
+          className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium shadow-sm w-full sm:w-auto"
         >
           Go to team
         </Link>
@@ -104,7 +104,7 @@ const InviteRedeemPage: React.FC = () => {
   }
 
   return wrap(
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-11 h-11 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
           <Mail className="w-5 h-5 text-blue-600" />

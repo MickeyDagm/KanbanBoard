@@ -226,6 +226,7 @@ function emptyCard(partial: Pick<Card, 'id' | 'listId' | 'title' | 'createdById'
     dueDate: null,
     priority: 'NONE' as Priority,
     cover: null,
+    done: false,
     createdAt: nowIso(),
     updatedAt: nowIso(),
     labels: [],

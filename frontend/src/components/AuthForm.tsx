@@ -285,13 +285,13 @@ const AuthForm: React.FC = () => {
         )}
 
         {/* Main Form Card (Soft Slate Tone - a bit darker than plain white) */}
-        <div className="bg-slate-100 border border-slate-200/90 rounded-3xl p-7 sm:p-9 shadow-2xl shadow-black/50 ring-1 ring-slate-900/5">
+        <div className="bg-slate-100 border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl shadow-black/50 ring-1 ring-slate-900/5">
           {/* Header info */}
           <div className="mb-6">
             {mode === 'signin' && (
               <>
-                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
-                <p className="text-sm text-slate-600 mt-1">
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1">
                   Sign in to your account to access your boards.
                 </p>
               </>
@@ -299,20 +299,20 @@ const AuthForm: React.FC = () => {
 
               {mode === 'signup' && (
                 <>
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                     Create an account
                   </h2>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
                     {signupStep === 'email' && 'Step 1: Enter your email to receive a secure code.'}
                     {signupStep === 'otp' && 'Step 2: Enter the 6-digit code sent to your inbox.'}
                     {signupStep === 'profile' && 'Step 3: Set your name and confirm your password.'}
                   </p>
 
                   {/* Signup Stepper Indicator */}
-                  <div className="mt-5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="mt-4 sm:mt-5 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                        className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                           signupStep === 'email'
                             ? 'bg-blue-600 text-white ring-4 ring-blue-100 shadow-sm'
                             : 'bg-emerald-600 text-white'
@@ -321,7 +321,7 @@ const AuthForm: React.FC = () => {
                         {signupStep === 'email' ? '1' : <Check className="w-3.5 h-3.5" />}
                       </div>
                       <span
-                        className={`text-xs font-semibold ${
+                        className={`text-[11px] sm:text-xs font-semibold ${
                           signupStep === 'email' ? 'text-slate-900' : 'text-slate-500'
                         }`}
                       >
@@ -330,14 +330,14 @@ const AuthForm: React.FC = () => {
                     </div>
 
                     <div
-                      className={`h-0.5 flex-1 mx-3 rounded transition-all ${
+                      className={`h-0.5 flex-1 mx-1.5 sm:mx-3 rounded transition-all ${
                         signupStep !== 'email' ? 'bg-emerald-500' : 'bg-slate-300'
                       }`}
                     />
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                        className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                           signupStep === 'otp'
                             ? 'bg-blue-600 text-white ring-4 ring-blue-100 shadow-sm'
                             : signupStep === 'profile'
@@ -352,7 +352,7 @@ const AuthForm: React.FC = () => {
                         )}
                       </div>
                       <span
-                        className={`text-xs font-semibold ${
+                        className={`text-[11px] sm:text-xs font-semibold ${
                           signupStep === 'otp'
                             ? 'text-slate-900'
                             : signupStep === 'profile'
@@ -365,14 +365,14 @@ const AuthForm: React.FC = () => {
                     </div>
 
                     <div
-                      className={`h-0.5 flex-1 mx-3 rounded transition-all ${
+                      className={`h-0.5 flex-1 mx-1.5 sm:mx-3 rounded transition-all ${
                         signupStep === 'profile' ? 'bg-blue-600' : 'bg-slate-300'
                       }`}
                     />
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                        className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                           signupStep === 'profile'
                             ? 'bg-blue-600 text-white ring-4 ring-blue-100 shadow-sm'
                             : 'bg-slate-200 text-slate-500 border border-slate-300'
@@ -381,7 +381,7 @@ const AuthForm: React.FC = () => {
                         3
                       </div>
                       <span
-                        className={`text-xs font-semibold ${
+                        className={`text-[11px] sm:text-xs font-semibold ${
                           signupStep === 'profile' ? 'text-slate-900' : 'text-slate-500'
                         }`}
                       >

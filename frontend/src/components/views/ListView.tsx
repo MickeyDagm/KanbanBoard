@@ -54,7 +54,7 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
                     data-testid="list-view-row"
                     data-card-title={card.title}
                     onClick={() => open(card.id)}
-                    className="group flex items-center gap-3 px-3 py-2 rounded-lg border border-transparent
+                    className="group flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-2.5 sm:py-2 rounded-lg border border-transparent
                              hover:bg-white hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all"
                   >
                     <button
@@ -64,7 +64,7 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
                         e.stopPropagation();
                         onUpdateCard(card.id, { done: !card.done });
                       }}
-                      className="text-slate-300 hover:text-emerald-600 transition-colors flex-shrink-0"
+                      className="text-slate-300 hover:text-emerald-600 transition-colors flex-shrink-0 p-0.5"
                     >
                       <CheckCircle2
                         className={`w-4 h-4 ${card.done ? 'text-emerald-600' : 'text-slate-300'}`}
@@ -78,7 +78,7 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
                       onChange={(e) =>
                         onUpdateCard(card.id, { priority: e.target.value as Priority })
                       }
-                      className={`text-[11px] font-semibold uppercase rounded px-1.5 py-1 border-0 outline-none cursor-pointer ${
+                      className={`text-[10px] sm:text-[11px] font-semibold uppercase rounded px-1.5 py-0.5 sm:py-1 border-0 outline-none cursor-pointer flex-shrink-0 ${
                         PRIORITY_BADGE[card.priority]
                       }`}
                     >
@@ -101,12 +101,12 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
                           if (e.key === 'Enter') commit();
                           if (e.key === 'Escape') setEditingId(null);
                         }}
-                        className="flex-1 text-sm px-2 py-1 border border-blue-300 rounded
+                        className="flex-1 min-w-0 text-sm px-2 py-1 border border-blue-300 rounded
                                  outline-none focus:ring-2 focus:ring-blue-500/30"
                       />
                     ) : (
                       <span
-                        className={`flex-1 text-sm truncate ${
+                        className={`flex-1 min-w-0 text-sm truncate ${
                           card.done ? 'line-through text-slate-400' : 'text-slate-800'
                         }`}
                         onDoubleClick={(e) => {
@@ -120,17 +120,17 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
 
                     {card.dueDate && (
                       <span
-                        className={`inline-flex items-center gap-1 text-xs ${
+                        className={`inline-flex items-center gap-1 text-[11px] sm:text-xs flex-shrink-0 ${
                           isOverdue(card.dueDate) ? 'text-red-600 font-medium' : 'text-slate-500'
                         }`}
                       >
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         {format(new Date(card.dueDate), 'MMM d')}
                       </span>
                     )}
 
                     {card.assignees.length > 0 && (
-                      <span className="text-xs text-slate-500 hidden md:inline">
+                      <span className="text-xs text-slate-500 hidden md:inline flex-shrink-0">
                         {card.assignees.map((a) => a.name).join(', ')}
                       </span>
                     )}
@@ -142,7 +142,7 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
                         e.stopPropagation();
                         startEdit(card);
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-600 p-1"
+                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-slate-400 hover:text-blue-600 p-1 flex-shrink-0"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>

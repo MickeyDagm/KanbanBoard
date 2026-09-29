@@ -56,7 +56,7 @@ const KanbanList: React.FC<KanbanListProps> = ({
   };
 
   return (
-    <div className="w-80 bg-slate-100/90 border border-slate-200/80 rounded-2xl p-3.5 flex-shrink-0 flex flex-col shadow-sm">
+    <div className="w-[84vw] max-w-[320px] sm:w-80 bg-slate-100/90 border border-slate-200/80 rounded-2xl p-3 sm:p-3.5 flex-shrink-0 flex flex-col shadow-sm snap-center sm:snap-align-none">
       {/* List Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         {isEditing ? (

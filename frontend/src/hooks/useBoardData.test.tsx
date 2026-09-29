@@ -47,6 +47,7 @@ const makeCard = (id: string, listId: string, position: number, title = id): Car
   dueDate: null,
   priority: 'NONE',
   cover: null,
+  done: false,
   createdById: 'u1',
   createdAt: iso,
   updatedAt: iso,

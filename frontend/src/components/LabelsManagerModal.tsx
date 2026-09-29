@@ -94,13 +94,13 @@ const LabelsManagerModal: React.FC<LabelsManagerModalProps> = ({ boardId, labels
 
   return (
     <div
-      className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-3 sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-800">Board labels</h2>
           <button
             onClick={onClose}
@@ -113,7 +113,7 @@ const LabelsManagerModal: React.FC<LabelsManagerModalProps> = ({ boardId, labels
 
         <ul className="divide-y divide-slate-100 max-h-[50vh] overflow-y-auto">
           {labels.map((label) => (
-            <li key={label.id} className="px-5 py-3 flex items-center gap-2 group/l">
+            <li key={label.id} className="px-4 sm:px-5 py-3 flex items-center gap-2 group/l">
               <input
                 type="color"
                 value={label.color}
@@ -135,7 +135,7 @@ const LabelsManagerModal: React.FC<LabelsManagerModalProps> = ({ boardId, labels
               />
               <button
                 onClick={() => deleteLabel(label)}
-                className="p-1.5 rounded text-slate-300 hover:text-red-500 opacity-0 group-hover/l:opacity-100"
+                className="p-1.5 rounded text-slate-400 hover:text-red-500 opacity-100 sm:opacity-0 sm:group-hover/l:opacity-100 transition-opacity"
                 title="Delete label"
               >
                 <Trash2 className="w-4 h-4" />
@@ -147,7 +147,7 @@ const LabelsManagerModal: React.FC<LabelsManagerModalProps> = ({ boardId, labels
           )}
         </ul>
 
-        <form onSubmit={createLabel} className="px-5 py-4 border-t border-slate-100 flex items-center gap-2">
+        <form onSubmit={createLabel} className="px-4 sm:px-5 py-3.5 sm:py-4 border-t border-slate-100 flex items-center gap-2">
           <input
             type="color"
             value={color}

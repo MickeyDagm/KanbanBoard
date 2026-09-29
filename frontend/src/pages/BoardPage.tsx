@@ -138,36 +138,38 @@ const BoardPage: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Toolbar */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
+      <div className="bg-white border-b border-slate-200 px-4 py-3 sm:px-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 flex-shrink-0">
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-slate-800 truncate tracking-tight">
+          <h1 className="text-base sm:text-lg font-semibold text-slate-800 truncate tracking-tight">
             {board.title}
           </h1>
           {board.description && (
             <p className="text-xs text-slate-500 truncate">{board.description}</p>
           )}
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <ViewSwitcher value={view} onChange={setView} />
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 flex-shrink-0">
+          <div className="self-start sm:self-auto">
+            <ViewSwitcher value={view} onChange={setView} />
+          </div>
+          <div className="relative flex-1 sm:flex-initial">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg
+              className="pl-10 pr-4 py-1.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-lg
                        text-sm focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/60
-                       outline-none transition-all w-64 shadow-sm hover:shadow"
+                       outline-none transition-all w-full sm:w-56 md:w-64 shadow-sm hover:shadow"
             />
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-6 md:p-8 flex-1 overflow-x-auto">
+      <div className="p-4 sm:p-6 md:p-8 flex-1 overflow-x-auto min-w-0">
         {view === 'board' && (
-          <div className="flex gap-4 items-start overflow-x-auto pb-6">
+          <div className="flex gap-3 sm:gap-4 items-start overflow-x-auto pb-6 snap-x snap-mandatory sm:snap-none -mx-4 px-4 sm:mx-0 sm:px-0">
             {lists.map((list) => (
               <KanbanList
                 key={list.id}
@@ -182,10 +184,10 @@ const BoardPage: React.FC = () => {
 
             <button
               onClick={() => setShowCreateListModal(true)}
-              className="flex-shrink-0 w-80 h-[140px] bg-white border-2 border-dashed border-slate-300
+              className="flex-shrink-0 w-[84vw] max-w-[320px] sm:w-80 h-[140px] bg-white border-2 border-dashed border-slate-300
                        rounded-2xl flex items-center justify-center gap-2 text-slate-500
                        hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/40
-                       transition-all duration-200 shadow-sm hover:shadow"
+                       transition-all duration-200 shadow-sm hover:shadow snap-center sm:snap-align-none"
             >
               <Plus className="w-5 h-5" />
               <span className="font-semibold text-sm">Add another list</span>

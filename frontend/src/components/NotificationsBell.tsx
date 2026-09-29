@@ -48,7 +48,11 @@ function notificationRoute(n: AppNotification): string | null {
 
 const notificationsKey = ['notifications'];
 
-const NotificationsBell: React.FC = () => {
+interface NotificationsBellProps {
+  placement?: 'up' | 'down';
+}
+
+const NotificationsBell: React.FC<NotificationsBellProps> = ({ placement = 'up' }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -135,8 +139,12 @@ const NotificationsBell: React.FC = () => {
       {open && (
         <div
           data-testid="notifications-panel"
-          className="absolute bottom-full mb-2 left-0 w-80 max-h-96 overflow-y-auto z-40
-                     bg-slate-800 border border-slate-700 rounded-lg shadow-xl"
+          className={`absolute ${
+            placement === 'down'
+              ? 'top-full mt-2 right-0 sm:right-auto sm:left-0'
+              : 'bottom-full mb-2 left-0'
+          } w-[calc(100vw-2rem)] sm:w-80 max-w-sm max-h-96 overflow-y-auto z-50
+          bg-slate-800 border border-slate-700 rounded-lg shadow-xl`}
         >
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700">
             <span className="text-xs font-semibold uppercase text-slate-400">Notifications</span>
