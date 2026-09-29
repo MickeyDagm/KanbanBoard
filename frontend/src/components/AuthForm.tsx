@@ -871,10 +871,6 @@ const AuthForm: React.FC = () => {
 
           {/* Minimalist Trust & Feature Footer */}
           <div className="mt-6 flex items-center justify-center gap-5 text-xs text-slate-500 font-medium">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Secure OTP Verification</span>
-            </div>
             <span className="text-slate-700">•</span>
             <div className="flex items-center gap-1.5 text-slate-400">
               <Users className="w-4 h-4 text-blue-400" />
