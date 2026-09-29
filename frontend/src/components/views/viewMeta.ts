@@ -1,6 +1,6 @@
 import type { Card, Priority } from '../../types';
 
-export type SortKey = 'title' | 'assignee' | 'priority' | 'due' | 'labels' | 'list';
+export type SortKey = 'title' | 'assignee' | 'priority' | 'due' | 'list';
 export type SortDir = 'asc' | 'desc';
 
 export const PRIORITY_RANK: Record<Priority, number> = {
@@ -70,7 +70,6 @@ export function guardOpen(onOpenCard: (id: string) => void): (id: string) => voi
 }
 
 const firstAssignee = (card: Card) => card.assignees[0]?.name ?? '';
-const firstLabel = (card: Card) => card.labels[0]?.name ?? '';
 
 export function compareBy(
   key: SortKey,
@@ -99,9 +98,6 @@ export function compareBy(
         else r = av - bv;
         break;
       }
-      case 'labels':
-        r = firstLabel(a).localeCompare(firstLabel(b));
-        break;
       case 'list':
         r = listTitle(a.listId).localeCompare(listTitle(b.listId)) || a.position - b.position;
         break;

@@ -2,20 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import { Calendar, Check, Plus, Trash2, X } from 'lucide-react';
+import { Calendar, CheckCircle2, Clock, Trash2, X } from 'lucide-react';
 import { cardsApi } from '../lib/api/cardsApi';
 import { ApiError } from '../lib/api';
 import { boardKey, useBoardMutations } from '../hooks/useBoardData';
 import { cardKey, useCardDetail } from '../hooks/useCardDetail';
 import { hasRole } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import type { ActivityItem, BoardMember, Card, CardDetail, Comment, Label, Priority, Role } from '../types';
+import type { ActivityItem, BoardMember, Card, CardDetail, Comment, Priority, Role } from '../types';
 
 interface TaskDetailModalProps {
   cardId: string;
   boardId: string;
   members: BoardMember[];
-  boardLabels: Label[];
   myRole: Role;
   onClose: () => void;
 }
@@ -52,6 +51,9 @@ function activityText(item: ActivityItem): string {
       if (fields.includes('assignees')) {
         return meta.assigned ? 'assigned a member' : 'removed an assignee';
       }
+      if (fields.includes('done')) {
+        return meta.done ? 'marked this card as completed' : 'marked this card as incomplete';
+      }
       if (fields.includes('title')) return 'renamed the card';
       if (fields.includes('priority')) return 'changed the priority';
       if (fields.includes('dueDate')) return 'changed the due date';
@@ -84,7 +86,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   cardId,
   boardId,
   members,
-  boardLabels,
   myRole,
   onClose,
 }) => {
@@ -95,12 +96,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState<string | null>(null);
-  const [newChecklist, setNewChecklist] = useState('');
-  const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
   const [commentDraft, setCommentDraft] = useState('');
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [commentEdit, setCommentEdit] = useState('');
-  const [popover, setPopover] = useState<'assign' | 'labels' | null>(null);
+  const [popover, setPopover] = useState<'assign' | null>(null);
 
   const detail = detailQuery.data;
   const card = detail?.card;
@@ -132,7 +131,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   // Adjust _count against the board cache's own values (may differ from the
   // detail payload — e.g. while other mutations are in flight).
-  const bumpBoardCount = (delta: { checklists?: number; comments?: number }) =>
+  const bumpBoardCount = (delta: { comments?: number }) =>
     queryClient.setQueryData<{ cards: Card[] }>(boardKey(boardId), (old) =>
       old
         ? {
@@ -143,7 +142,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               return {
                 ...c,
                 _count: {
-                  checklists: Math.max(count.checklists + (delta.checklists ?? 0), 0),
+                  ...count,
                   comments: Math.max(count.comments + (delta.comments ?? 0), 0),
                 },
               };
@@ -182,26 +181,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     savePatch({ description: descDraft });
   };
 
-  // ── labels / assignees ────────────────────────────────────────────────────
-  const toggleLabel = async (label: Label) => {
-    if (!card) return;
-    const attached = card.labels.some((l) => l.id === label.id);
-    try {
-      if (attached) {
-        await cardsApi.detachLabel(cardId, label.id);
-        const labels = card.labels.filter((l) => l.id !== label.id);
-        patchDetail((old) => (old ? { ...old, card: { ...old.card, labels } } : old));
-        patchBoardCard({ labels });
-      } else {
-        const { card: updated } = await cardsApi.attachLabel(cardId, label.id);
-        patchDetail((old) => (old ? { ...old, card: { ...old.card, labels: updated.labels } } : old));
-        patchBoardCard({ labels: updated.labels });
-        setPopover(null);
-      }
-    } catch (e) {
-      fail(e, 'Could not update labels');
-    }
-  };
+  // ── assignees ─────────────────────────────────────────────────────────────
 
   const toggleAssignee = async (user: BoardMember) => {
     if (!card) return;
@@ -225,129 +205,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
-  // ── checklists ────────────────────────────────────────────────────────────
-  const addChecklist = async () => {
-    const title = newChecklist.trim();
-    if (!title) return;
-    try {
-      const { checklist } = await cardsApi.createChecklist(cardId, title);
-      patchDetail((old) =>
-        old ? { ...old, card: { ...old.card, checklists: [...old.card.checklists, checklist] } } : old
-      );
-      bumpBoardCount({ checklists: 1 });
-      setNewChecklist('');
-    } catch (e) {
-      fail(e, 'Could not add checklist');
-    }
-  };
-
-  const renameChecklist = async (checklistId: string, title: string) => {
-    if (!title.trim()) return;
-    try {
-      const { checklist } = await cardsApi.updateChecklist(checklistId, { title: title.trim() });
-      patchDetail((old) =>
-        old
-          ? {
-              ...old,
-              card: {
-                ...old.card,
-                checklists: old.card.checklists.map((c) => (c.id === checklistId ? checklist : c)),
-              },
-            }
-          : old
-      );
-    } catch (e) {
-      fail(e, 'Could not rename checklist');
-    }
-  };
-
-  const deleteChecklist = async (checklistId: string) => {
-    try {
-      await cardsApi.removeChecklist(checklistId);
-      patchDetail((old) =>
-        old
-          ? {
-              ...old,
-              card: {
-                ...old.card,
-                checklists: old.card.checklists.filter((c) => c.id !== checklistId),
-              },
-            }
-          : old
-      );
-      bumpBoardCount({ checklists: -1 });
-    } catch (e) {
-      fail(e, 'Could not delete checklist');
-    }
-  };
-
-  const addItem = async (checklistId: string) => {
-    const text = (itemDrafts[checklistId] ?? '').trim();
-    if (!text) return;
-    try {
-      const { item } = await cardsApi.createItem(checklistId, text);
-      patchDetail((old) =>
-        old
-          ? {
-              ...old,
-              card: {
-                ...old.card,
-                checklists: old.card.checklists.map((c) =>
-                  c.id === checklistId ? { ...c, items: [...c.items, item] } : c
-                ),
-              },
-            }
-          : old
-      );
-      setItemDrafts((d) => ({ ...d, [checklistId]: '' }));
-    } catch (e) {
-      fail(e, 'Could not add item');
-    }
-  };
-
-  const toggleItem = async (checklistId: string, itemId: string, done: boolean) => {
-    try {
-      const { item } = await cardsApi.updateItem(itemId, { done });
-      patchDetail((old) =>
-        old
-          ? {
-              ...old,
-              card: {
-                ...old.card,
-                checklists: old.card.checklists.map((c) =>
-                  c.id === checklistId
-                    ? { ...c, items: c.items.map((i) => (i.id === itemId ? item : i)) }
-                    : c
-                ),
-              },
-            }
-          : old
-      );
-    } catch (e) {
-      fail(e, 'Could not update item');
-    }
-  };
-
-  const deleteItem = async (checklistId: string, itemId: string) => {
-    try {
-      await cardsApi.removeItem(itemId);
-      patchDetail((old) =>
-        old
-          ? {
-              ...old,
-              card: {
-                ...old.card,
-                checklists: old.card.checklists.map((c) =>
-                  c.id === checklistId ? { ...c, items: c.items.filter((i) => i.id !== itemId) } : c
-                ),
-              },
-            }
-          : old
-      );
-    } catch (e) {
-      fail(e, 'Could not delete item');
-    }
-  };
 
   // ── comments ──────────────────────────────────────────────────────────────
   const addComment = async () => {
@@ -459,19 +316,32 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     return null;
   }
 
-  const checklistProgress = (c: { items: { done: boolean }[] }) => ({
-    done: c.items.filter((i) => i.done).length,
-    total: c.items.length,
-  });
-
   const unassigned = members.filter((m2) => !card.assignees.some((a) => a.id === m2.id));
-  const unattached = boardLabels.filter((l) => !card.labels.some((cl) => cl.id === l.id));
 
   return overlay(
     <>
       {/* Header */}
       <div className="px-6 pt-5 pb-3 border-b border-slate-100 flex items-start gap-3">
         <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => savePatch({ done: !card.done })}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                card.done
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
+              }`}
+              aria-label={card.done ? 'Mark as incomplete' : 'Mark as done'}
+            >
+              <CheckCircle2 className={`w-3.5 h-3.5 ${card.done ? 'text-white' : 'text-slate-500'}`} />
+              <span>{card.done ? 'Completed' : 'Mark as done'}</span>
+            </button>
+            <span className="text-xs text-slate-400 inline-flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Updated {format(new Date(card.updatedAt), 'MMM d, HH:mm')}
+            </span>
+          </div>
           <input
             value={titleDraft ?? card.title}
             onChange={(e) => setTitleDraft(e.target.value)}
@@ -480,7 +350,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
               if (e.key === 'Escape') setTitleDraft(null);
             }}
-            className="w-full text-lg font-semibold text-slate-800 bg-transparent outline-none rounded px-1 -ml-1 py-0.5 hover:bg-slate-50 focus:bg-slate-50"
+            className={`w-full text-lg font-semibold bg-transparent outline-none rounded px-1 -ml-1 py-0.5 hover:bg-slate-50 focus:bg-slate-50 transition-colors ${
+              card.done ? 'line-through text-slate-400' : 'text-slate-800'
+            }`}
             aria-label="Card title"
           />
           <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
@@ -522,117 +394,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             />
           </section>
 
-          {/* Checklists */}
-          <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-              Checklists
-            </h3>
-            <div className="space-y-4">
-              {card.checklists.map((cl) => {
-                const prog = checklistProgress(cl);
-                return (
-                  <div key={cl.id} className="group/cl">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <input
-                        defaultValue={cl.title}
-                        onBlur={(e) => {
-                          if (e.target.value.trim() !== cl.title) renameChecklist(cl.id, e.target.value);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                        }}
-                        className="text-sm font-medium text-slate-700 bg-transparent outline-none rounded px-1 -ml-1 hover:bg-slate-50 focus:bg-slate-50 flex-1 min-w-0"
-                        aria-label="Checklist title"
-                      />
-                      <span className="text-xs text-slate-400 tabular-nums">
-                        {prog.done}/{prog.total}
-                      </span>
-                      <button
-                        onClick={() => deleteChecklist(cl.id)}
-                        className="p-1 rounded text-slate-300 hover:text-red-500 opacity-0 group-hover/cl:opacity-100"
-                        title="Delete checklist"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full mb-2 overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 rounded-full transition-all"
-                        style={{ width: `${prog.total ? (prog.done / prog.total) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <ul className="space-y-1">
-                      {cl.items.map((item) => (
-                        <li key={item.id} className="group/item flex items-center gap-2 rounded hover:bg-slate-50 px-1">
-                          <button
-                            onClick={() => toggleItem(cl.id, item.id, !item.done)}
-                            className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
-                              item.done
-                                ? 'bg-blue-600 border-blue-600 text-white'
-                                : 'border-slate-300 hover:border-blue-400'
-                            }`}
-                            aria-label={item.done ? 'Mark not done' : 'Mark done'}
-                          >
-                            {item.done && <Check className="w-3 h-3" />}
-                          </button>
-                          <span
-                            className={`flex-1 text-sm py-1 ${
-                              item.done ? 'text-slate-400 line-through' : 'text-slate-700'
-                            }`}
-                          >
-                            {item.text}
-                          </span>
-                          <button
-                            onClick={() => deleteItem(cl.id, item.id)}
-                            className="p-1 rounded text-slate-300 hover:text-red-500 opacity-0 group-hover/item:opacity-100"
-                            title="Delete item"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        addItem(cl.id);
-                      }}
-                      className="mt-1"
-                    >
-                      <input
-                        value={itemDrafts[cl.id] ?? ''}
-                        onChange={(e) => setItemDrafts((d) => ({ ...d, [cl.id]: e.target.value }))}
-                        placeholder="+ Add an item"
-                        className="w-full text-sm text-slate-600 bg-transparent outline-none rounded px-1 py-1.5 hover:bg-slate-50 focus:bg-slate-50"
-                      />
-                    </form>
-                  </div>
-                );
-              })}
 
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  addChecklist();
-                }}
-                className="flex gap-2"
-              >
-                <input
-                  value={newChecklist}
-                  onChange={(e) => setNewChecklist(e.target.value)}
-                  placeholder="Checklist title…"
-                  className="flex-1 text-sm px-3 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30"
-                />
-                <button
-                  type="submit"
-                  disabled={!newChecklist.trim()}
-                  className="px-3 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 disabled:opacity-40"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </form>
-            </div>
-          </section>
 
           {/* Comments */}
           <section>
@@ -830,58 +592,31 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             )}
           </div>
 
-          {/* Labels */}
-          <div className="relative">
+
+
+          {/* Status */}
+          <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-              Labels
+              Status
             </h3>
-            <div className="flex flex-wrap gap-1.5">
-              {card.labels.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => toggleLabel(l)}
-                  title="Remove label"
-                  className="px-2 py-1 text-xs rounded-full font-medium hover:opacity-70"
-                  style={{
-                    backgroundColor: `${l.color}1f`,
-                    color: '#334155',
-                    border: `1px solid ${l.color}59`,
-                  }}
-                >
-                  {l.name} ×
-                </button>
-              ))}
-              {card.labels.length === 0 && (
-                <span className="text-xs text-slate-400">No labels</span>
-              )}
-            </div>
             <button
-              onClick={() => setPopover(popover === 'labels' ? null : 'labels')}
-              className="mt-2 w-full text-xs text-slate-500 border border-dashed border-slate-300 rounded-lg py-1.5 hover:border-blue-400 hover:text-blue-600"
+              type="button"
+              onClick={() => savePatch({ done: !card.done })}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                card.done
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
             >
-              + Add label
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className={`w-4 h-4 ${card.done ? 'text-emerald-600' : 'text-slate-400'}`} />
+                {card.done ? 'Completed' : 'In Progress'}
+              </span>
+              <span className="text-xs text-slate-400">{card.done ? 'Reopen' : 'Complete'}</span>
             </button>
-            {popover === 'labels' && (
-              <div className="absolute z-10 mt-1 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg p-1 max-h-44 overflow-y-auto">
-                {unattached.length === 0 && (
-                  <p className="text-xs text-slate-400 p-2">All labels applied</p>
-                )}
-                {unattached.map((l) => (
-                  <button
-                    key={l.id}
-                    onClick={() => toggleLabel(l)}
-                    className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-slate-50 flex items-center gap-2"
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: l.color }}
-                    />
-                    <span className="truncate">{l.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
+
+
 
           {/* Priority */}
           <div>
@@ -914,8 +649,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             />
           </div>
 
+          {/* Last updated */}
+          <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-400 flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            <span>Last updated: {format(new Date(card.updatedAt), 'MMM d, yyyy HH:mm')}</span>
+          </div>
+
           {/* Danger zone */}
-          <div className="pt-2 border-t border-slate-200">
+          <div className="pt-1">
             <button
               onClick={deleteCard}
               className="w-full flex items-center justify-center gap-1.5 text-sm text-red-600 border border-red-200 rounded-lg py-2 hover:bg-red-50"

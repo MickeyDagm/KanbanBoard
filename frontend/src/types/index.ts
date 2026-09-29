@@ -128,6 +128,7 @@ export interface Card {
   dueDate: string | null;
   priority: Priority;
   cover: string | null;
+  done: boolean;
   createdById: string;
   createdAt: string;
   updatedAt: string;

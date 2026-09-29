@@ -23,7 +23,6 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'assignee', label: 'Assignee' },
   { key: 'priority', label: 'Priority' },
   { key: 'due', label: 'Due' },
-  { key: 'labels', label: 'Labels' },
   { key: 'list', label: 'List' },
 ];
 
@@ -91,7 +90,18 @@ const TableView: React.FC<TableViewProps> = ({ lists, cards, onOpenCard }) => {
               onClick={() => open(card.id)}
               className="border-b border-slate-100 last:border-0 hover:bg-blue-50/40 cursor-pointer"
             >
-              <td className={`${cell} text-slate-800 font-medium`}>{card.title}</td>
+              <td className={`${cell} font-medium`}>
+                <div className="flex items-center gap-2">
+                  {card.done && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 flex-shrink-0">
+                      Done
+                    </span>
+                  )}
+                  <span className={card.done ? 'line-through text-slate-400' : 'text-slate-800'}>
+                    {card.title}
+                  </span>
+                </div>
+              </td>
               <td className={`${cell} text-slate-600`}>
                 {card.assignees.length > 0 ? card.assignees.map((a) => a.name).join(', ') : '—'}
               </td>
@@ -108,23 +118,6 @@ const TableView: React.FC<TableViewProps> = ({ lists, cards, onOpenCard }) => {
                 {card.dueDate ? (
                   <span className={isOverdue(card.dueDate) ? 'text-red-600 font-medium' : 'text-slate-600'}>
                     {format(new Date(card.dueDate), 'MMM d, yyyy')}
-                  </span>
-                ) : (
-                  <span className="text-slate-300">—</span>
-                )}
-              </td>
-              <td className={cell}>
-                {card.labels.length > 0 ? (
-                  <span className="flex flex-wrap gap-1">
-                    {card.labels.map((l) => (
-                      <span
-                        key={l.id}
-                        className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded-full"
-                        style={{ backgroundColor: `${l.color}1f`, color: '#334155' }}
-                      >
-                        {l.name}
-                      </span>
-                    ))}
                   </span>
                 ) : (
                   <span className="text-slate-300">—</span>

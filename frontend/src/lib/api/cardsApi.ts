@@ -34,6 +34,7 @@ export const cardsApi = {
       dueDate?: string | null;
       priority?: Priority;
       cover?: string | null;
+      done?: boolean;
     }
   ) => apiFetch<{ card: Card }>(`/cards/${id}`, { method: 'PATCH', body }),
 

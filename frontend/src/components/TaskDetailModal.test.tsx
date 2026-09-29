@@ -57,31 +57,35 @@ const detail: CardDetail = {
   card: {
     id: 'c1',
     listId: 'l1',
-    title: 'Launch checklist',
-    description: '',
+    title: 'Fix login bug',
+    description: 'Detailed description here',
     position: 0,
     dueDate: null,
     priority: 'HIGH',
     cover: null,
+    done: false,
     createdById: 'u1',
     createdAt: '2026-09-20T10:00:00.000Z',
     updatedAt: '2026-09-20T10:00:00.000Z',
     labels: [],
     assignees: [],
-    _count: { checklists: 1, comments: 0 },
-    checklists: [
+    _count: { checklists: 0, comments: 1 },
+    checklists: [],
+    comments: [
       {
-        id: 'cl1',
+        id: 'cm1',
         cardId: 'c1',
-        title: 'Steps',
-        position: 0,
-        items: [
-          { id: 'i1', checklistId: 'cl1', text: 'Write tests', done: false, position: 0 },
-          { id: 'i2', checklistId: 'cl1', text: 'Ship it', done: true, position: 1 },
-        ],
+        authorId: 'u1',
+        body: 'Initial comment on this task',
+        createdAt: '2026-09-21T10:00:00.000Z',
+        updatedAt: '2026-09-21T10:00:00.000Z',
+        author: {
+          id: 'u1',
+          name: 'Ada',
+          avatarColor: '#3b82f6',
+        },
       },
     ],
-    comments: [],
   },
   activity: [],
 };
@@ -95,7 +99,6 @@ const renderModal = (onClose = vi.fn()) => {
           cardId="c1"
           boardId="b1"
           members={[]}
-          boardLabels={[]}
           myRole="OWNER"
           onClose={onClose}
         />
@@ -111,43 +114,75 @@ beforeEach(() => {
   vi.mocked(cardsApi.getDetail).mockResolvedValue(detail);
 });
 
-describe('TaskDetailModal checklists', () => {
-  it('renders checklist items with progress', async () => {
+describe('TaskDetailModal', () => {
+  it('renders card title, description, and existing comments and last updated', async () => {
     renderModal();
 
-    expect(await screen.findByText('Write tests')).toBeInTheDocument();
-    expect(screen.getByText('Ship it')).toBeInTheDocument();
-    expect(screen.getByText('1/2')).toBeInTheDocument();
-    expect(screen.getByLabelText('Mark done')).toBeInTheDocument();
-    expect(screen.getByLabelText('Mark not done')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Fix login bug')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Detailed description here')).toBeInTheDocument();
+    expect(screen.getByText('Initial comment on this task')).toBeInTheDocument();
+    expect(screen.getByText(/Updated/)).toBeInTheDocument();
   });
 
-  it('toggles a checklist item done via cardsApi.updateItem', async () => {
-    vi.mocked(cardsApi.updateItem).mockResolvedValue({
-      item: { ...detail.card.checklists[0].items[0], done: true },
+  it('marks card as completed', async () => {
+    vi.mocked(cardsApi.update).mockResolvedValue({
+      card: { ...detail.card, done: true },
     } as never);
     renderModal();
     const user = userEvent.setup();
 
-    await screen.findByText('Write tests');
-    await user.click(screen.getByRole('button', { name: 'Mark done' }));
+    await screen.findByDisplayValue('Fix login bug');
+    const doneBtn = screen.getByRole('button', { name: 'Mark as done' });
+    await user.click(doneBtn);
 
-    await waitFor(() => expect(cardsApi.updateItem).toHaveBeenCalledWith('i1', { done: true }));
-    expect(await screen.findAllByRole('button', { name: 'Mark not done' })).toHaveLength(2);
-    expect(screen.getByText('2/2')).toBeInTheDocument();
-    expect(toast.error).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(cardsApi.update).toHaveBeenCalledWith('c1', { done: true })
+    );
   });
 
-  it('shows a toast and keeps the item when the toggle request fails', async () => {
-    vi.mocked(cardsApi.updateItem).mockRejectedValue(new Error('Server exploded'));
+  it('posts a new comment via cardsApi.addComment', async () => {
+    vi.mocked(cardsApi.addComment).mockResolvedValue({
+      comment: {
+        id: 'cm2',
+        cardId: 'c1',
+        authorId: 'u1',
+        body: 'New follow-up comment',
+        createdAt: '2026-09-22T10:00:00.000Z',
+        updatedAt: '2026-09-22T10:00:00.000Z',
+        author: {
+          id: 'u1',
+          name: 'Ada',
+          avatarColor: '#3b82f6',
+        },
+      },
+    } as never);
     renderModal();
     const user = userEvent.setup();
 
-    await screen.findByText('Write tests');
-    await user.click(screen.getByRole('button', { name: 'Mark done' }));
+    await screen.findByDisplayValue('Fix login bug');
+    const input = screen.getByPlaceholderText('Write a comment… (Ctrl+Enter to post)');
+    await user.type(input, 'New follow-up comment');
+    await user.click(screen.getByRole('button', { name: 'Comment' }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Server exploded'));
-    expect(screen.getByRole('button', { name: 'Mark done' })).toBeInTheDocument();
-    expect(screen.getByText('1/2')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(cardsApi.addComment).toHaveBeenCalledWith('c1', 'New follow-up comment')
+    );
+    expect(input).toHaveValue('');
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('shows a toast when posting a comment fails', async () => {
+    vi.mocked(cardsApi.addComment).mockRejectedValue(new Error('Failed to post comment'));
+    renderModal();
+    const user = userEvent.setup();
+
+    await screen.findByDisplayValue('Fix login bug');
+    const input = screen.getByPlaceholderText('Write a comment… (Ctrl+Enter to post)');
+    await user.type(input, 'Another comment');
+    await user.click(screen.getByRole('button', { name: 'Comment' }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Failed to post comment')
+    );
   });
 });

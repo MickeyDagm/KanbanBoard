@@ -38,12 +38,12 @@ const CreateListModal: React.FC<CreateListModalProps> = ({ isOpen, onClose, onCr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Create New List</h2>
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-100 border border-slate-200/90 rounded-2xl p-6 w-full max-w-md shadow-2xl ring-1 ring-slate-900/5">
+        <h2 className="text-xl font-bold text-slate-900 mb-4">Create New List</h2>
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+          <div className="mb-5">
+            <label htmlFor="title" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
               List Title
             </label>
             <input
@@ -51,25 +51,26 @@ const CreateListModal: React.FC<CreateListModalProps> = ({ isOpen, onClose, onCr
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#72c02c] focus:border-transparent"
-              placeholder="Enter list title"
+              className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-sm"
+              placeholder="e.g. In Progress"
               required
+              autoFocus
             />
           </div>
-          <div className="flex justify-end space-x-3">
+          <div className="flex justify-end space-x-3 pt-2 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-slate-700 hover:bg-slate-200 rounded-xl font-medium transition-colors"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className={`px-4 py-2 bg-[#72c02c] text-white rounded-lg font-medium transition-colors ${
-                loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#5a9c23]'
+              disabled={loading || !title.trim()}
+              className={`px-4 py-2 text-sm bg-blue-600 text-white rounded-xl font-medium shadow-sm transition-colors ${
+                loading || !title.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
               }`}
             >
               {loading ? 'Creating...' : 'Create List'}

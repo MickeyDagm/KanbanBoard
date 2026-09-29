@@ -30,6 +30,7 @@ const updateCardSchema = z
     dueDate: dateString.nullable().optional(),
     priority: z.enum(['NONE', 'LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
     cover: z.string().trim().max(32).nullable().optional(),
+    done: z.boolean().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, 'No fields to update');
 
@@ -122,6 +123,7 @@ router.patch(
     if (body.priority !== undefined) data.priority = body.priority;
     if (body.cover !== undefined) data.cover = body.cover;
     if (body.dueDate !== undefined) data.dueDate = body.dueDate === null ? null : new Date(body.dueDate);
+    if (body.done !== undefined) data.done = body.done;
 
     const updated = await prisma.card.update({
       where: { id: card.id },
@@ -134,7 +136,7 @@ router.patch(
       boardId: board.id,
       cardId: card.id,
       type: 'CARD_UPDATED',
-      metadata: { fields: Object.keys(data) },
+      metadata: { fields: Object.keys(data), done: body.done },
     });
     emitBoardEvent(board.id, 'card:updated', { actorId: userId, clientEventId: clientEventId(req) }, { card: serializeCard(updated) });
 

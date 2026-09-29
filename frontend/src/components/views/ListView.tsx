@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { Calendar, Pencil } from 'lucide-react';
+import { Calendar, CheckCircle2, Pencil } from 'lucide-react';
 import type { Card, List, Priority } from '../../types';
 import { PRIORITY_BADGE, PRIORITY_LABEL, guardOpen, isOverdue } from './viewMeta';
 
@@ -8,7 +8,7 @@ interface ListViewProps {
   lists: List[];
   cards: Card[];
   onOpenCard: (id: string) => void;
-  onUpdateCard: (id: string, patch: Partial<Pick<Card, 'title' | 'priority'>>) => void;
+  onUpdateCard: (id: string, patch: Partial<Pick<Card, 'title' | 'priority' | 'done'>>) => void;
 }
 
 const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateCard }) => {
@@ -57,6 +57,20 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
                     className="group flex items-center gap-3 px-3 py-2 rounded-lg border border-transparent
                              hover:bg-white hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all"
                   >
+                    <button
+                      type="button"
+                      aria-label={card.done ? 'Mark not done' : 'Mark done'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUpdateCard(card.id, { done: !card.done });
+                      }}
+                      className="text-slate-300 hover:text-emerald-600 transition-colors flex-shrink-0"
+                    >
+                      <CheckCircle2
+                        className={`w-4 h-4 ${card.done ? 'text-emerald-600' : 'text-slate-300'}`}
+                      />
+                    </button>
+
                     <select
                       value={card.priority}
                       aria-label="Card priority"
@@ -92,7 +106,9 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
                       />
                     ) : (
                       <span
-                        className="flex-1 text-sm text-slate-800 truncate"
+                        className={`flex-1 text-sm truncate ${
+                          card.done ? 'line-through text-slate-400' : 'text-slate-800'
+                        }`}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
                           startEdit(card);
@@ -101,16 +117,6 @@ const ListView: React.FC<ListViewProps> = ({ lists, cards, onOpenCard, onUpdateC
                         {card.title}
                       </span>
                     )}
-
-                    {card.labels.map((l) => (
-                      <span
-                        key={l.id}
-                        className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded-full hidden sm:inline"
-                        style={{ backgroundColor: `${l.color}1f`, color: '#334155' }}
-                      >
-                        {l.name}
-                      </span>
-                    ))}
 
                     {card.dueDate && (
                       <span

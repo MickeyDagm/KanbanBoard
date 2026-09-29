@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { DndContext } from '@dnd-kit/core';
 import { format } from 'date-fns';
 import KanbanCard from './KanbanCard';
 import type { Card, User } from '../types';
@@ -23,6 +22,7 @@ const baseCard = (over: Partial<Card> = {}): Card => ({
   dueDate: null,
   priority: 'NONE',
   cover: null,
+  done: false,
   createdById: 'u1',
   createdAt: '2026-09-20T10:00:00.000Z',
   updatedAt: '2026-09-20T10:00:00.000Z',
@@ -33,22 +33,17 @@ const baseCard = (over: Partial<Card> = {}): Card => ({
 });
 
 const renderCard = (card: Card, onOpen = vi.fn()) => {
-  render(
-    <DndContext>
-      <KanbanCard card={card} onOpen={onOpen} />
-    </DndContext>
-  );
+  render(<KanbanCard card={card} onOpen={onOpen} />);
   return onOpen;
 };
 
 describe('KanbanCard', () => {
-  it('renders title, priority badge, labels, due date, comment count and assignees', async () => {
+  it('renders title, priority badge, due date, comment count and assignees', async () => {
     const due = new Date(Date.now() + 2 * 86_400_000);
     renderCard(
       baseCard({
         priority: 'URGENT',
         dueDate: due.toISOString(),
-        labels: [{ id: 'lab1', boardId: 'b1', name: 'frontend', color: '#3b82f6' }],
         assignees: [alice],
         _count: { checklists: 1, comments: 3 },
       })
@@ -56,10 +51,17 @@ describe('KanbanCard', () => {
 
     expect(screen.getByText('Fix login bug')).toBeInTheDocument();
     expect(screen.getByText('Urgent')).toBeInTheDocument();
-    expect(screen.getByText('frontend')).toBeInTheDocument();
     expect(screen.getByText(format(due, 'MMM d'))).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByTitle('Alice Wonder')).toBeInTheDocument();
+  });
+
+  it('renders a Done badge and line-through title when completed', () => {
+    renderCard(baseCard({ done: true }));
+
+    expect(screen.getByText('Done')).toBeInTheDocument();
+    const titleEl = screen.getByText('Fix login bug');
+    expect(titleEl.className).toContain('line-through');
   });
 
   it('marks an overdue due date with red styling', () => {

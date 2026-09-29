@@ -17,22 +17,26 @@ const CardChip: React.FC<{
   onOpen: (id: string) => void;
 }> = ({ card, onOpen }) => (
   <button
-    draggable
     data-testid="calendar-chip"
     data-card-title={card.title}
-    onDragStart={(e) => e.dataTransfer.setData('text/plain', card.id)}
     onClick={() => onOpen(card.id)}
     className={`w-full text-left text-xs px-1.5 py-1 rounded border bg-white hover:border-blue-400
                 hover:shadow-sm transition-colors flex items-center gap-1.5 ${
-                  isOverdue(card.dueDate) ? 'border-red-300' : 'border-slate-200'
+                  card.done
+                    ? 'border-emerald-200 bg-emerald-50/30'
+                    : isOverdue(card.dueDate)
+                    ? 'border-red-300'
+                    : 'border-slate-200'
                 }`}
     title={card.title}
   >
     <span
       className="w-2 h-2 rounded-full flex-shrink-0"
-      style={{ backgroundColor: PRIORITY_DOT[card.priority] }}
+      style={{ backgroundColor: card.done ? '#10b981' : PRIORITY_DOT[card.priority] }}
     />
-    <span className="truncate text-slate-700">{card.title}</span>
+    <span className={`truncate ${card.done ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+      {card.title}
+    </span>
   </button>
 );
 

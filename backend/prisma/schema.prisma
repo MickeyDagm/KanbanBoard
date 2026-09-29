@@ -164,6 +164,7 @@ model Card {
   dueDate     DateTime?
   priority    Priority  @default(NONE)
   cover       String?
+  done        Boolean   @default(false)
   createdById String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
