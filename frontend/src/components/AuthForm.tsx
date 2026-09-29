@@ -15,7 +15,6 @@ import {
   EyeOff,
   CheckCircle2,
   Users,
-  ShieldCheck,
   Check,
 } from 'lucide-react';
 import { ApiError } from '../lib/api';
