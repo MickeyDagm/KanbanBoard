@@ -119,7 +119,7 @@ const AppShell: React.FC = () => {
       </nav>
 
       {user && (
-        <div className="border-t border-slate-800 p-3 flex items-center gap-2.5">
+        <div className="relative border-t border-slate-800 p-3 flex items-center gap-2.5">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
             style={{ backgroundColor: user.avatarColor }}
@@ -130,7 +130,7 @@ const AppShell: React.FC = () => {
             <div className="text-sm font-medium text-white truncate">{user.name}</div>
             <div className="text-xs text-slate-400 truncate">{user.email}</div>
           </div>
-          <NotificationsBell />
+          <NotificationsBell onItemClick={onItemClick} />
           <button
             onClick={signOut}
             title="Sign out"

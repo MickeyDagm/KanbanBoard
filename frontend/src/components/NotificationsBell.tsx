@@ -50,9 +50,15 @@ const notificationsKey = ['notifications'];
 
 interface NotificationsBellProps {
   placement?: 'up' | 'down';
+  onItemClick?: () => void;
+  className?: string;
 }
 
-const NotificationsBell: React.FC<NotificationsBellProps> = ({ placement = 'up' }) => {
+const NotificationsBell: React.FC<NotificationsBellProps> = ({
+  placement = 'up',
+  onItemClick,
+  className,
+}) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -88,20 +94,34 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ placement = 'up' 
     };
   }, [queryClient]);
 
-  // Close on outside click.
+  // Close on outside click, touch, or Escape key.
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
     };
     document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown, { passive: true });
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [open]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: notificationsKey });
 
   const handleClick = async (n: AppNotification) => {
     setOpen(false);
+    onItemClick?.();
     if (!n.readAt) {
       await notificationsApi.markRead(n.id).catch(() => undefined);
       refresh();
@@ -116,13 +136,22 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ placement = 'up' 
     refresh();
   };
 
+  const containerClass = className ?? (placement === 'down' ? 'relative' : 'static');
+  const panelPositionClass =
+    placement === 'down'
+      ? 'fixed inset-x-3 top-14 sm:inset-x-auto sm:right-4 sm:top-14 sm:w-80 md:absolute md:top-full md:right-0 md:mt-2 max-w-sm sm:max-w-none mx-auto sm:mx-0 max-h-[calc(100vh-4.5rem)] sm:max-h-96'
+      : 'absolute bottom-full mb-2 inset-x-2 md:inset-x-auto md:left-2 md:w-80 max-h-[calc(100vh-6rem)] md:max-h-96';
+
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className={containerClass}>
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         title="Notifications"
         aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`}
-        className="relative p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="relative p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         <Bell className="w-[18px] h-[18px]" />
         {unreadCount > 0 && (
@@ -139,19 +168,15 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ placement = 'up' 
       {open && (
         <div
           data-testid="notifications-panel"
-          className={`absolute ${
-            placement === 'down'
-              ? 'top-full mt-2 right-0 sm:right-auto sm:left-0'
-              : 'bottom-full mb-2 left-0'
-          } w-[calc(100vw-2rem)] sm:w-80 max-w-sm max-h-96 overflow-y-auto z-50
-          bg-slate-800 border border-slate-700 rounded-lg shadow-xl`}
+          className={`${panelPositionClass} overflow-y-auto z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl`}
         >
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700">
             <span className="text-xs font-semibold uppercase text-slate-400">Notifications</span>
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={handleMarkAll}
-                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 p-1 -mr-1 rounded transition-colors"
               >
                 <CheckCheck className="w-3.5 h-3.5" />
                 Mark all read
@@ -166,6 +191,7 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ placement = 'up' 
               {notifications.map((n) => (
                 <li key={n.id}>
                   <button
+                    type="button"
                     onClick={() => handleClick(n)}
                     className={`w-full text-left px-3 py-2.5 flex gap-2.5 items-start hover:bg-slate-700/60 transition-colors ${
                       n.readAt ? 'opacity-60' : ''
@@ -178,7 +204,7 @@ const NotificationsBell: React.FC<NotificationsBellProps> = ({ placement = 'up' 
                       {n.actor.name?.charAt(0)?.toUpperCase() || '?'}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className={`block text-sm ${n.readAt ? 'text-slate-300' : 'text-white'}`}>
+                      <span className={`block text-sm break-words ${n.readAt ? 'text-slate-300' : 'text-white'}`}>
                         {notificationText(n)}
                       </span>
                       <span className="block text-xs text-slate-500 mt-0.5">{timeAgo(n.createdAt)}</span>

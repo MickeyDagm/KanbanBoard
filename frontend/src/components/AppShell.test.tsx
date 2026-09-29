@@ -8,6 +8,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { authApi } from '../lib/api/authApi';
 import { teamsApi } from '../lib/api/teamsApi';
 import { boardsApi } from '../lib/api/boardsApi';
+import { notificationsApi } from '../lib/api/notificationsApi';
 import type { User } from '../types';
 
 vi.mock('../lib/api/authApi', () => ({
@@ -34,6 +35,14 @@ vi.mock('../lib/api/boardsApi', () => ({
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
+  },
+}));
+
+vi.mock('../lib/api/notificationsApi', () => ({
+  notificationsApi: {
+    list: vi.fn(),
+    markRead: vi.fn(),
+    markAllRead: vi.fn(),
   },
 }));
 
@@ -81,6 +90,26 @@ beforeEach(() => {
       },
     ],
   } as never);
+  vi.mocked(notificationsApi.list).mockResolvedValue({
+    notifications: [
+      {
+        id: 'n1',
+        userId: 'u1',
+        actorId: 'u2',
+        actor: { id: 'u2', name: 'Bob Smith', avatarColor: '#10b981' },
+        type: 'ASSIGNED',
+        boardId: 'b1',
+        cardId: 'c1',
+        card: { id: 'c1', title: 'Sprint Board Task' },
+        readAt: null,
+        createdAt: '2026-09-01T10:00:00.000Z',
+      },
+    ],
+    unreadCount: 1,
+  } as never);
+  vi.mocked(notificationsApi.markRead).mockResolvedValue({
+    notification: {} as never,
+  });
 });
 
 describe('AppShell mobile responsiveness', () => {
@@ -125,6 +154,56 @@ describe('AppShell mobile responsiveness', () => {
     expect(drawerLink).toBeDefined();
     await user.click(drawerLink!);
 
+    expect(mobileDrawer.className).toContain('-translate-x-full');
+  });
+
+  it('opens notifications panel from mobile header and applies responsive positioning', async () => {
+    const user = userEvent.setup();
+    renderAppShell();
+
+    // The header is the md:hidden header element
+    const header = document.querySelector('header');
+    expect(header).toBeInTheDocument();
+
+    const headerBellButton = header?.querySelector('button[title="Notifications"]');
+    expect(headerBellButton).toBeInTheDocument();
+
+    await user.click(headerBellButton!);
+
+    const panel = await screen.findByTestId('notifications-panel');
+    expect(panel).toBeInTheDocument();
+    expect(panel.className).toContain('fixed');
+    expect(panel.className).toContain('inset-x-3');
+    expect(panel.className).toContain('top-14');
+  });
+
+  it('opens notifications in mobile drawer and closes drawer when a notification is clicked', async () => {
+    const user = userEvent.setup();
+    renderAppShell();
+
+    // Open drawer
+    const openButton = await screen.findByRole('button', { name: 'Open navigation menu' });
+    await user.click(openButton);
+
+    const closeButton = await screen.findByRole('button', { name: 'Close navigation menu' });
+    const mobileDrawer = closeButton.closest('aside')!;
+    expect(mobileDrawer.className).toContain('translate-x-0');
+
+    // Find bell inside mobile drawer
+    const drawerBellButton = mobileDrawer.querySelector('button[title="Notifications"]');
+    expect(drawerBellButton).toBeInTheDocument();
+
+    await user.click(drawerBellButton!);
+
+    const panel = await screen.findByTestId('notifications-panel');
+    expect(panel).toBeInTheDocument();
+    expect(panel.className).toContain('inset-x-2');
+
+    // Click on notification
+    const notifItem = await screen.findByText(/Bob Smith assigned you/i);
+    await user.click(notifItem);
+
+    // Mobile drawer should be closed now (-translate-x-full)
     expect(mobileDrawer.className).toContain('-translate-x-full');
   });
 });
