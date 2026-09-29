@@ -1,5 +1,12 @@
 import { registerClientEventId } from './clientEvents';
 
+/**
+ * Absolute API origin, set at build time via VITE_API_URL (e.g. on Render the
+ * backend lives on its own service). Empty in dev → same-origin requests that
+ * the Vite dev proxy forwards to the backend.
+ */
+export const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -29,7 +36,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, {
+    response = await fetch(`${API_BASE}/api${path}`, {
       method,
       credentials: 'include',
       headers,

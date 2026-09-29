@@ -21,7 +21,7 @@ export function verifyToken(token: string): { sub: string } {
 export function setAuthCookie(res: Response, token: string): void {
   res.cookie(env.cookieName, token, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: env.cookieSameSite,
     secure: env.isProd,
     path: '/',
     maxAge: SEVEN_DAYS_MS,
@@ -31,7 +31,7 @@ export function setAuthCookie(res: Response, token: string): void {
 export function clearAuthCookie(res: Response): void {
   res.clearCookie(env.cookieName, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: env.cookieSameSite,
     secure: env.isProd,
     path: '/',
   });

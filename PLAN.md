@@ -6,7 +6,7 @@
 |---|---|
 | DB / ORM | PostgreSQL 16 (local, running on port 5433) + Prisma |
 | Backend | New `backend/` folder, Node + TypeScript + Express |
-| Auth | JWT in **httpOnly cookie**, bcrypt password hashing, Vite dev proxy (no CORS pain in dev) |
+| Auth | JWT in **httpOnly cookie**, bcrypt password hashing, Vite dev proxy (no CORS pain in dev). Split deploys: `VITE_API_URL` on the frontend + `CLIENT_ORIGIN`/`PUBLIC_URL`/`COOKIE_SAMESITE=none` on the API |
 | Realtime | Socket.IO (replaces Supabase `postgres_changes`) |
 | Invites | Invite links/codes + optional SMTP email delivery (off until `SMTP_HOST` is set) |
 | Notion pages | **Out of scope** — Kanban + rich tasks only |
@@ -21,13 +21,19 @@
 
 ```
 KanbanBoard/
-├── package.json              # root scripts: dev (runs both), lint, test, db:*
-├── vite.config.ts            # + proxy: /api and /socket.io → localhost:4000
-├── src/                      # EXISTING frontend (heavily refactored)
-├── backend/                  # NEW
+├── .gitignore  PLAN.md          # repo root — no package.json (each app owns its deps)
+├── frontend/                    # SPA — its own package.json / node_modules
+│   ├── package.json             # scripts: dev, build, lint, typecheck, test, preview
+│   ├── index.html               # entry; /src/main.tsx
+│   ├── vite.config.ts           # proxy: /api and /socket.io → localhost:4000
+│   ├── vitest.config.ts  tsconfig*.json  eslint.config.js
+│   ├── tailwind.config.js  postcss.config.js  .env.example   # VITE_API_URL (build time)
+│   └── src/                     # components/, contexts/, hooks/, lib/, pages/
+└── backend/                     # NEW
 │   ├── package.json          # express, prisma, socket.io, zod, jsonwebtoken, bcrypt...
 │   ├── tsconfig.json
-│   ├── .env.example          # DATABASE_URL, JWT_SECRET, PORT=4000, SMTP_*, PUBLIC_URL
+│   ├── .env.example          # DATABASE_URL, JWT_SECRET, PORT=4000, CLIENT_ORIGIN,
+│   │                         # PUBLIC_URL, COOKIE_SAMESITE, SMTP_*, REDIS_URL, OTP_*
 │   ├── prisma/
 │   │   ├── schema.prisma
 │   │   ├── migrations/
@@ -44,10 +50,17 @@ KanbanBoard/
 │   │   ├── realtime/socket.ts
 │   │   └── tests/
 │   └── vitest.config.ts
-└── supabase/  scripts/  src/lib/supabase.ts   # DELETED (after port)
+└── (supabase/  scripts/  src/lib/supabase.ts   # DELETED after the port)
 ```
 
-**Dev flow:** `npm run dev` → `concurrently` runs `vite` (5173) + `tsx watch backend/src/index.ts` (4000). Browser talks to same origin; Vite proxies `/api` and `/socket.io` (ws: true). Auth cookie works seamlessly.
+**Dev flow (two terminals — no root orchestrator):**
+```bash
+npm --prefix backend run dev     # Express + socket.io  → :4000
+npm --prefix frontend run dev    # Vite                 → :5173
+```
+Browser talks to same origin; Vite proxies `/api` and `/socket.io` (ws: true) to :4000, so the auth cookie behaves exactly like a same-site deploy.
+
+**Production flow (two Render services):** build the SPA with `VITE_API_URL=<api origin>` (inlined at build) and set `CLIENT_ORIGIN`/`PUBLIC_URL` = the site URL plus `COOKIE_SAMESITE=none` on the API — `*.onrender.com` subdomains are cross-site (onrender.com is a public suffix), so a `lax` cookie would never be sent back.
 
 ---
 
@@ -142,6 +155,10 @@ Port the existing 3 tables, then extend:
 
 ## 5. Frontend changes
 
+> All `src/...` paths below are relative to `frontend/` — the SPA got its own
+> `package.json`/`node_modules` and the root package was dropped (so no more
+> `concurrently` / root `db:*` scripts; use `npm --prefix ...`).
+
 ### Remove
 - `src/lib/supabase.ts`, `supabase/` (migrations already ported to Prisma), `scripts/seed-database.js`
 - deps: `@supabase/supabase-js`, `supabase`, `dotenv`
@@ -177,7 +194,7 @@ Port the existing 3 tables, then extend:
 > **Status (2026-09-28):** Phases 0–8 ✅ complete. Phase 8 verified: frontend lint/tsc/build green, backend 98/98 tests, 33/33 headless-Chrome UI checkpoint ×3 runs (view switcher → ListView groups + inline rename/priority persist → TableView 6 sortable columns with asc/desc + aria-sort + nulls-last due → Calendar month grid, chips on due days, unscheduled bucket, drag-to-schedule persists, view choice survives reload). Next: Phase 9 (RTL tests, README, final polish).
 
 **Phase 0 — Cleanup & setup** (small) ✅
-Prune Supabase deps/files, update `.env.example`, add `concurrently`, root scripts (`dev`, `dev:api`, `dev:web`, `db:migrate`, `db:seed`, `db:studio`, `test`). Create Postgres role/db (`kanban`, `kanban_test`) — note: **port 5433**, not 5432. Vite proxy config. Verify `npm run lint` + `npm run build` still pass.
+Prune Supabase deps/files, update `.env.example`, add `concurrently`, root scripts (`dev`, `dev:api`, `dev:web`, `db:migrate`, `db:seed`, `db:studio`, `test`) *(later superseded: root package removed, see §1)*. Create Postgres role/db (`kanban`, `kanban_test`) — note: **port 5433**, not 5432. Vite proxy config. Verify `npm run lint` + `npm run build` still pass.
 
 **Phase 1 — Backend skeleton + auth** ✅
 `backend/` scaffold, Prisma schema v1 (all models above), initial migration, env config, JWT cookie auth (register/login/logout/me, bcrypt), middleware (auth, validate, errorHandler), health route. Auto-create Personal team on register. **Tests:** auth happy path + duplicate email + weak password + `/me` without cookie.

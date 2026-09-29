@@ -1,15 +1,17 @@
 import { io, type Socket } from 'socket.io-client';
+import { API_BASE } from './api';
 
 let socket: Socket | null = null;
 
 /**
- * Singleton socket connected to the same origin as the SPA (Vite proxies
- * `/socket.io` to the backend with `ws: true`). Auth uses the same JWT cookie
- * as the REST API — no token handling in the client.
+ * Singleton socket connected to the API origin (API_BASE — same origin as the
+ * SPA in dev, where Vite proxies `/socket.io` to the backend with `ws: true`;
+ * the backend origin directly when VITE_API_URL is set at build time). Auth
+ * uses the same JWT cookie as the REST API — no token handling in the client.
  */
 export function getSocket(): Socket {
   if (!socket) {
-    socket = io({
+    socket = io(API_BASE || undefined, {
       autoConnect: false,
       withCredentials: true,
       reconnection: true,

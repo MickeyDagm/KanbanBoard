@@ -27,6 +27,15 @@ const jwtSecret = process.env.JWT_SECRET as string;
 const smtpPort = Number(process.env.SMTP_PORT ?? 587);
 const clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
 
+const cookieSameSite = process.env.COOKIE_SAMESITE ?? 'lax';
+if (cookieSameSite !== 'lax' && cookieSameSite !== 'none') {
+  throw new Error(
+    `Invalid COOKIE_SAMESITE: "${cookieSameSite}". Use "lax" (same-site deploys, ` +
+      `the default) or "none" (frontend and API on different sites, e.g. two ` +
+      `separate *.onrender.com services — requires HTTPS, which Render provides).`
+  );
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProd: process.env.NODE_ENV === 'production',
@@ -37,6 +46,14 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   clientOrigin,
   cookieName: 'kanban_token',
+  /**
+   * SameSite policy for the auth cookie. `lax` (default) works when the SPA
+   * and API share a registrable domain (localhost, or app.example.com +
+   * api.example.com). Use `none` when they are cross-site — e.g. two separate
+   * *.onrender.com services, since onrender.com is on the Public Suffix List.
+   * `none` always requires Secure, so it needs HTTPS (isProd below).
+   */
+  cookieSameSite: cookieSameSite as 'lax' | 'none',
 
   /** Public base URL used to build links that leave the app (invite emails). */
   publicUrl: (process.env.PUBLIC_URL ?? clientOrigin).replace(/\/+$/, ''),
