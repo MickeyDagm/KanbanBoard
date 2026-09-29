@@ -434,18 +434,27 @@ const TeamDetailPage: React.FC = () => {
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-slate-800">Invite links</h2>
+              <h2 className="font-semibold text-slate-800">Team invite link</h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Email an invite, or share a link — anyone with it can join as Member.
+                Share this link or email it — creating a new link automatically replaces the previous one.
               </p>
             </div>
             <button
-              onClick={() => createInvite.mutate()}
+              onClick={() => {
+                const count = (invitesQuery.data?.invites ?? []).length;
+                if (count > 0) {
+                  if (confirm('Creating a new link will replace the existing invite link. Continue?')) {
+                    createInvite.mutate();
+                  }
+                } else {
+                  createInvite.mutate();
+                }
+              }}
               disabled={createInvite.isPending}
               className="flex items-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
-              Create link
+              {(invitesQuery.data?.invites ?? []).length > 0 ? 'Regenerate link' : 'Create link'}
             </button>
           </div>
 

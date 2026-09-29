@@ -14,9 +14,9 @@ import { env } from '../config/env.js';
 import { isEmailConfigured, sendInviteEmail } from '../services/emailService.js';
 import { notifyInviteRedeemed } from '../services/notificationService.js';
 import { clientEventId, emitTeamEvent } from '../realtime/socket.js';
+import { verifyToken } from '../utils/tokens.js';
 
 const router = Router();
-router.use(requireAuth);
 
 const inviteLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -44,9 +44,9 @@ const emailInviteLimiter = rateLimit({
   skip: () => env.isTest,
 });
 
-type InviteStatus = 'active' | 'revoked' | 'expired' | 'maxed';
+export type InviteStatus = 'active' | 'revoked' | 'expired' | 'maxed';
 
-function inviteStatus(invite: Pick<Invite, 'revokedAt' | 'expiresAt' | 'maxUses' | 'usedCount'>): InviteStatus {
+export function inviteStatus(invite: Pick<Invite, 'revokedAt' | 'expiresAt' | 'maxUses' | 'usedCount'>): InviteStatus {
   if (invite.revokedAt) return 'revoked';
   if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) return 'expired';
   if (invite.maxUses !== null && invite.usedCount >= invite.maxUses) return 'maxed';
@@ -66,6 +66,9 @@ interface InviteOptions {
 }
 
 async function createInviteRecord(teamId: string, createdById: string, opts: InviteOptions) {
+  // Requirement 2.1: remove previous invites for this team so only one invitation link exists
+  await prisma.invite.deleteMany({ where: { teamId } });
+
   return prisma.invite.create({
     data: {
       code: newCode(),
@@ -83,6 +86,7 @@ const inviteUrl = (code: string) => `${env.publicUrl}/invite/${code}`;
 // POST /api/teams/:teamId/invites — ADMIN+; invite links carry a role and expiry
 router.post(
   '/teams/:teamId/invites',
+  requireAuth,
   inviteLimiter,
   validate(createInviteSchema),
   asyncHandler(async (req, res) => {
@@ -103,6 +107,7 @@ router.post(
 // the link to one address. Fails cleanly when SMTP is not configured.
 router.post(
   '/teams/:teamId/invites/email',
+  requireAuth,
   emailInviteLimiter,
   validate(sendInviteSchema),
   asyncHandler(async (req, res) => {
@@ -149,6 +154,7 @@ router.post(
 // GET /api/teams/:teamId/invites — ADMIN+
 router.get(
   '/teams/:teamId/invites',
+  requireAuth,
   asyncHandler(async (req, res) => {
     const userId = req.user!.id;
     const { team } = await loadTeamAccess(userId, req.params.teamId, 'ADMIN');
@@ -165,6 +171,7 @@ router.get(
 // DELETE /api/invites/:id — ADMIN+ (soft revoke)
 router.delete(
   '/invites/:id',
+  requireAuth,
   asyncHandler(async (req, res) => {
     const userId = req.user!.id;
     const invite = await prisma.invite.findUnique({ where: { id: req.params.id } });
@@ -180,12 +187,21 @@ router.delete(
   })
 );
 
-// GET /api/invites/:code — preview: team, role, inviter, validity, membership
+// GET /api/invites/:code — preview: team, role, inviter, validity, membership (allows optional auth)
 router.get(
   '/invites/:code',
   inviteLimiter,
   asyncHandler(async (req, res) => {
-    const userId = req.user!.id;
+    let userId: string | null = null;
+    const token = req.cookies?.[env.cookieName];
+    if (token) {
+      try {
+        userId = verifyToken(token).sub;
+      } catch {
+        userId = null;
+      }
+    }
+
     const invite = await prisma.invite.findUnique({
       where: { code: req.params.code },
       include: {
@@ -195,14 +211,21 @@ router.get(
     });
     if (!invite) throw ApiError.notFound('Invite not found');
 
-    const membership = await prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId: invite.teamId, userId } },
-    });
+    const membership = userId
+      ? await prisma.teamMember.findUnique({
+          where: { teamId_userId: { teamId: invite.teamId, userId } },
+        })
+      : null;
 
     res.json({
       team: invite.team,
       role: invite.role,
-      inviter: invite.createdBy,
+      inviter: {
+        id: invite.createdBy.id,
+        name: invite.createdBy.name,
+        email: userId ? invite.createdBy.email : undefined,
+        avatarColor: invite.createdBy.avatarColor,
+      },
       status: inviteStatus(invite),
       alreadyMember: !!membership,
     });
@@ -212,6 +235,7 @@ router.get(
 // POST /api/invites/:code/redeem — logged-in user joins (idempotent)
 router.post(
   '/invites/:code/redeem',
+  requireAuth,
   inviteLimiter,
   asyncHandler(async (req, res) => {
     const userId = req.user!.id;

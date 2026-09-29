@@ -8,11 +8,20 @@ import { ApiError } from '../lib/errors.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { clearAuthCookie, setAuthCookie, signToken } from '../utils/tokens.js';
+import {
+  clearAuthCookie,
+  setAuthCookie,
+  signToken,
+  signSignupToken,
+  verifySignupToken,
+} from '../utils/tokens.js';
 import { pickAvatarColor } from '../utils/selects.js';
 import { env } from '../config/env.js';
 import { isEmailConfigured } from '../services/emailService.js';
 import { issueOtp, verifyOtp, type OtpCheck } from '../services/otpService.js';
+import { inviteStatus } from './invites.js';
+import { emitTeamEvent } from '../realtime/socket.js';
+import { notifyInviteRedeemed } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -21,19 +30,21 @@ const authLimiter = rateLimit({
   limit: 50,
   standardHeaders: true,
   legacyHeaders: false,
-  // The test suite performs many auth calls from a single IP.
   skip: () => env.isTest,
 });
 
 const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(8, 'Password must be at least 8 characters').max(72),
-  name: z.string().trim().min(1).max(60),
+  name: z.string().trim().min(1, 'Name is required').max(60),
+  signupToken: z.string().optional(),
+  inviteCode: z.string().trim().optional(),
 });
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(1),
+  password: z.string().min(1, 'Password is required'),
+  inviteCode: z.string().trim().optional(),
 });
 
 const emailSchema = z.object({
@@ -71,35 +82,83 @@ function otpError(check: Extract<OtpCheck, { ok: false }>): ApiError {
   }
 }
 
-/**
- * Removes a freshly registered, still-unverified account (used when the
- * verification email could not be sent, so nobody is left half-registered).
- */
-async function discardUser(userId: string) {
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.team.deleteMany({ where: { createdById: userId } });
-      await tx.user.delete({ where: { id: userId } });
-    });
-  } catch (err) {
-    console.error('Could not roll back registration:', err);
-  }
-}
+// POST /auth/signup/send-otp — Step 1.2 & 1.3: asks email, sends OTP
+router.post(
+  '/signup/send-otp',
+  authLimiter,
+  validate(emailSchema),
+  asyncHandler(async (req, res) => {
+    const { email } = req.body as z.infer<typeof emailSchema>;
 
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw ApiError.conflict('An account with this email already exists. Please sign in instead.');
+    }
+
+    try {
+      await issueOtp('signup', email, 'there');
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      throw ApiError.badGateway('Could not send verification email. Please try again.');
+    }
+
+    res.json({ ok: true, message: 'Verification code sent to your email' });
+  })
+);
+
+// POST /auth/signup/verify-otp — Step 1.4: verifies OTP, returns signupToken
+router.post(
+  '/signup/verify-otp',
+  authLimiter,
+  validate(codeSchema),
+  asyncHandler(async (req, res) => {
+    const { email, code } = req.body as z.infer<typeof codeSchema>;
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw ApiError.conflict('An account with this email already exists. Please sign in instead.');
+    }
+
+    const check = await verifyOtp('signup', email, code);
+    if (!check.ok) throw otpError(check);
+
+    const signupToken = signSignupToken(email);
+    res.json({ ok: true, signupToken });
+  })
+);
+
+// POST /auth/register — Step 1.5 & 1.6: user created in DB after password confirmation
 router.post(
   '/register',
   authLimiter,
   validate(registerSchema),
   asyncHandler(async (req, res) => {
-    const { email, password, name } = req.body as z.infer<typeof registerSchema>;
+    const { email, password, name, signupToken, inviteCode } = req.body as z.infer<typeof registerSchema>;
     const needsOtp = otpRequired();
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) throw ApiError.conflict('An account with this email already exists');
 
+    // Verify signupToken if provided or when OTP is required
+    if (signupToken) {
+      try {
+        const verified = verifySignupToken(signupToken);
+        if (verified.email.toLowerCase() !== email.toLowerCase()) {
+          throw ApiError.badRequest('Verification token does not match email');
+        }
+      } catch {
+        throw ApiError.badRequest('Invalid or expired signup verification token. Please verify email again.');
+      }
+    } else if (needsOtp && !env.isTest) {
+      throw ApiError.badRequest('Email must be verified before completing registration');
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     let user: { id: string; email: string; name: string; avatarColor: string; createdAt: Date };
+    let joinedTeamId: string | null = null;
+    let joinedRole: 'MEMBER' | 'ADMIN' | 'OWNER' | null = null;
+
     try {
       user = await prisma.$transaction(async (tx) => {
         const created = await tx.user.create({
@@ -108,10 +167,11 @@ router.post(
             passwordHash,
             name,
             avatarColor: pickAvatarColor(email),
-            emailVerifiedAt: needsOtp ? null : new Date(),
+            emailVerifiedAt: new Date(),
           },
           select: publicUser,
         });
+
         await tx.team.create({
           data: {
             name: 'Personal',
@@ -119,6 +179,27 @@ router.post(
             members: { create: { userId: created.id, role: 'OWNER' } },
           },
         });
+
+        // Requirement 2.3: If registered from invitation link, auto-join team
+        if (inviteCode) {
+          const invite = await tx.invite.findUnique({ where: { code: inviteCode } });
+          if (invite && inviteStatus(invite) === 'active') {
+            await tx.teamMember.create({
+              data: {
+                teamId: invite.teamId,
+                userId: created.id,
+                role: invite.role,
+              },
+            });
+            await tx.invite.update({
+              where: { id: invite.id },
+              data: { usedCount: { increment: 1 } },
+            });
+            joinedTeamId = invite.teamId;
+            joinedRole = invite.role;
+          }
+        }
+
         return created;
       });
     } catch (err) {
@@ -128,27 +209,21 @@ router.post(
       throw err;
     }
 
-    if (needsOtp) {
-      try {
-        await issueOtp('verify', email, name);
-      } catch (err) {
-        await discardUser(user.id);
-        throw err instanceof ApiError
-          ? err
-          : ApiError.badGateway(
-              'Could not send the verification email. Check the SMTP settings in backend/.env.'
-            );
-      }
-      res.status(201).json({ user, requiresVerification: true });
-      return;
+    if (joinedTeamId && joinedRole) {
+      emitTeamEvent(joinedTeamId, 'member:joined', { actorId: user.id }, {
+        teamId: joinedTeamId,
+        userId: user.id,
+        role: joinedRole,
+      });
+      void notifyInviteRedeemed({ actorId: user.id, teamId: joinedTeamId }).catch(() => undefined);
     }
 
     setAuthCookie(res, signToken(user.id));
-    res.status(201).json({ user });
+    res.status(201).json({ user, joinedTeamId });
   })
 );
 
-// POST /auth/verify-email — confirms the address and signs the user in
+// POST /auth/verify-email — legacy support for unverified addresses
 router.post(
   '/verify-email',
   authLimiter,
@@ -197,13 +272,16 @@ router.post(
     const user = await prisma.user.findUnique({ where: { email } });
     if (user && !user.emailVerifiedAt) {
       await issueOtp('verify', email, user.name);
+    } else if (!user) {
+      // Also allow resending signup OTP
+      await issueOtp('signup', email, 'there').catch(() => undefined);
     }
 
     res.status(202).json({ ok: true });
   })
 );
 
-// POST /auth/forgot-password — emails a reset code (always 202 when it works)
+// POST /auth/forgot-password — emails a reset code
 router.post(
   '/forgot-password',
   authLimiter,
@@ -212,7 +290,7 @@ router.post(
     const { email } = req.body as z.infer<typeof emailSchema>;
     if (!otpRequired()) {
       throw ApiError.serviceUnavailable(
-        'Email is not configured on this server. Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS in backend/.env, then restart it.'
+        'Email is not configured on this server. Set SMTP_HOST in backend/.env.'
       );
     }
 
@@ -241,7 +319,6 @@ router.post(
       where: { id: user.id },
       data: {
         passwordHash: await bcrypt.hash(password, 10),
-        // Owning the inbox is exactly what the code proves.
         emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
       },
     });
@@ -250,25 +327,59 @@ router.post(
   })
 );
 
+// POST /auth/login — fast and efficient: DB check + bcrypt compare + auto-join team if invited
 router.post(
   '/login',
   authLimiter,
   validate(loginSchema),
   asyncHandler(async (req, res) => {
-    const { email, password } = req.body as z.infer<typeof loginSchema>;
+    const { email, password, inviteCode } = req.body as z.infer<typeof loginSchema>;
 
     const user = await prisma.user.findUnique({ where: { email } });
     const valid = user ? await bcrypt.compare(password, user.passwordHash) : false;
     if (!user || !valid) throw ApiError.unauthorized('Invalid email or password');
 
+    // Auto-verify if legacy unverified user logs in with valid password
     if (!user.emailVerifiedAt) {
-      // Password is correct, so handing over a fresh code only helps the owner.
-      await issueOtp('verify', email, user.name).catch(() => undefined);
-      throw new ApiError(
-        403,
-        'EMAIL_NOT_VERIFIED',
-        'Verify your email to sign in — we just sent you a new code.'
-      );
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() },
+      });
+    }
+
+    let joinedTeamId: string | null = null;
+    // Requirement 2.3: If logging in from invitation link, auto-join team
+    if (inviteCode) {
+      try {
+        const invite = await prisma.invite.findUnique({ where: { code: inviteCode } });
+        if (invite && inviteStatus(invite) === 'active') {
+          const existing = await prisma.teamMember.findUnique({
+            where: { teamId_userId: { teamId: invite.teamId, userId: user.id } },
+          });
+          if (!existing) {
+            await prisma.$transaction(async (tx) => {
+              await tx.teamMember.create({
+                data: { teamId: invite.teamId, userId: user.id, role: invite.role },
+              });
+              await tx.invite.update({
+                where: { id: invite.id },
+                data: { usedCount: { increment: 1 } },
+              });
+            });
+            joinedTeamId = invite.teamId;
+            emitTeamEvent(invite.teamId, 'member:joined', { actorId: user.id }, {
+              teamId: invite.teamId,
+              userId: user.id,
+              role: invite.role,
+            });
+            void notifyInviteRedeemed({ actorId: user.id, teamId: invite.teamId }).catch(() => undefined);
+          } else {
+            joinedTeamId = invite.teamId;
+          }
+        }
+      } catch (err) {
+        console.error('Auto-joining team on login failed:', err);
+      }
     }
 
     setAuthCookie(res, signToken(user.id));
@@ -280,6 +391,7 @@ router.post(
         avatarColor: user.avatarColor,
         createdAt: user.createdAt,
       },
+      joinedTeamId,
     });
   })
 );

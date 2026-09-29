@@ -20,10 +20,16 @@ let transporter: Transporter | null = null;
 function getTransporter(): Transporter {
   if (!transporter) {
     transporter = nodemailer.createTransport({
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 100,
       host: env.smtp.host,
       port: env.smtp.port,
       secure: env.smtp.secure,
       auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.pass } : undefined,
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
     });
   }
   return transporter;
@@ -105,27 +111,33 @@ export async function sendInviteEmail(input: InviteEmailInput): Promise<void> {
   if (!isEmailConfigured()) {
     throw new Error('SMTP is not configured (SMTP_HOST is empty)');
   }
-  await getTransporter().sendMail({
+  const sendTask = getTransporter().sendMail({
     from: fromAddress(),
     to: input.to,
     subject: `${input.inviterName} invited you to ${input.teamName} on ${env.appName}`,
     text: inviteText(input),
     html: inviteHtml(input),
   });
+  const timeoutTask = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Email server timed out after 9 seconds')), 9000)
+  );
+  await Promise.race([sendTask, timeoutTask]);
 }
 
 export interface OtpEmailInput {
   to: string;
   name: string;
   code: string;
-  purpose: 'verify' | 'reset';
+  purpose: 'verify' | 'reset' | 'signup';
 }
 
 function otpText({ name, code, purpose, to }: OtpEmailInput): string {
-  const headline =
-    purpose === 'verify'
-      ? `Hi ${name}, confirm this address to finish creating your ${env.appName} account.`
-      : `Hi ${name}, use this code to choose a new ${env.appName} password for ${to}.`;
+  let headline = `Hi ${name}, confirm your email to finish creating your ${env.appName} account.`;
+  if (purpose === 'reset') {
+    headline = `Hi ${name}, use this code to choose a new ${env.appName} password for ${to}.`;
+  } else if (purpose === 'signup') {
+    headline = `Hi ${name}, verify your email to create your ${env.appName} account.`;
+  }
   return [
     headline,
     '',
@@ -137,14 +149,17 @@ function otpText({ name, code, purpose, to }: OtpEmailInput): string {
 }
 
 function otpHtml({ name, code, purpose, to }: OtpEmailInput): string {
-  const headline =
-    purpose === 'verify'
-      ? `Confirm your ${escapeHtml(env.appName)} email`
-      : `Reset your ${escapeHtml(env.appName)} password`;
-  const sub =
-    purpose === 'verify'
-      ? `Hi ${escapeHtml(name)}, enter this code to finish creating your account.`
-      : `Hi ${escapeHtml(name)}, enter this code to choose a new password for ${escapeHtml(to)}.`;
+  let headline = `Confirm your ${escapeHtml(env.appName)} email`;
+  let sub = `Hi ${escapeHtml(name)}, enter this code to finish creating your account.`;
+
+  if (purpose === 'reset') {
+    headline = `Reset your ${escapeHtml(env.appName)} password`;
+    sub = `Hi ${escapeHtml(name)}, enter this code to choose a new password for ${escapeHtml(to)}.`;
+  } else if (purpose === 'signup') {
+    headline = `Verify your email for ${escapeHtml(env.appName)}`;
+    sub = `Hi ${escapeHtml(name)}, enter this 6-digit code to complete creating your account.`;
+  }
+
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f1f5f9;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;">
@@ -168,19 +183,25 @@ function otpHtml({ name, code, purpose, to }: OtpEmailInput): string {
 </html>`;
 }
 
-/** Sends a one-time code (email verification / password reset). */
+/** Sends a one-time code (email verification / password reset / signup). */
 export async function sendOtpEmail(input: OtpEmailInput): Promise<void> {
   if (!isEmailConfigured()) {
     throw new Error('SMTP is not configured (SMTP_HOST is empty)');
   }
-  await getTransporter().sendMail({
+  const subject =
+    input.purpose === 'reset'
+      ? `${input.code} is your ${env.appName} password reset code`
+      : `${input.code} is your ${env.appName} verification code`;
+
+  const sendTask = getTransporter().sendMail({
     from: fromAddress(),
     to: input.to,
-    subject:
-      input.purpose === 'verify'
-        ? `${input.code} is your ${env.appName} verification code`
-        : `${input.code} is your ${env.appName} password reset code`,
+    subject,
     text: otpText(input),
     html: otpHtml(input),
   });
+  const timeoutTask = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Email server timed out after 9 seconds')), 9000)
+  );
+  await Promise.race([sendTask, timeoutTask]);
 }

@@ -7,8 +7,23 @@ import type { User } from '../types';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUp: (email: string, password: string, name: string) => Promise<{ requiresVerification: boolean }>;
-  signIn: (email: string, password: string) => Promise<void>;
+  sendSignupOtp: (email: string) => Promise<void>;
+  verifySignupOtp: (email: string, code: string) => Promise<string>;
+  completeSignup: (params: {
+    email: string;
+    name: string;
+    password: string;
+    signupToken?: string;
+    inviteCode?: string;
+  }) => Promise<{ joinedTeamId?: string }>;
+  signUp: (
+    email: string,
+    password: string,
+    name: string,
+    signupToken?: string,
+    inviteCode?: string
+  ) => Promise<{ requiresVerification?: boolean; joinedTeamId?: string }>;
+  signIn: (email: string, password: string, inviteCode?: string) => Promise<{ joinedTeamId?: string }>;
   signOut: () => Promise<void>;
   verifyEmail: (email: string, code: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
@@ -33,6 +48,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let cancelled = false;
 
+    // Timeout guard so the app never gets permanently stuck on a loading screen
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    }, 8000);
+
     authApi
       .me()
       .then(({ user }) => {
@@ -42,11 +64,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!cancelled) setUser(null);
       })
       .finally(() => {
+        clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       });
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
   }, []);
 
@@ -56,31 +80,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     else disconnectSocket();
   }, [user]);
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const sendSignupOtp = async (email: string) => {
     try {
-      const { user: created, requiresVerification } = await authApi.register({
-        email,
-        password,
-        name,
-      });
-      if (requiresVerification) {
-        // The AuthForm shows the code step; no session until it is confirmed.
-        return { requiresVerification: true };
-      }
+      await authApi.sendSignupOtp({ email });
+      toast.success(`Verification code sent to ${email}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not send verification code');
+      throw error;
+    }
+  };
+
+  const verifySignupOtp = async (email: string, code: string) => {
+    try {
+      const { signupToken } = await authApi.verifySignupOtp({ email, code });
+      toast.success('Email verified successfully!');
+      return signupToken;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Invalid code');
+      throw error;
+    }
+  };
+
+  const completeSignup = async (params: {
+    email: string;
+    name: string;
+    password: string;
+    signupToken?: string;
+    inviteCode?: string;
+  }) => {
+    try {
+      const { user: created, joinedTeamId } = await authApi.register(params);
       setUser(created);
       toast.success('Account created successfully!');
-      return { requiresVerification: false };
+      return { joinedTeamId };
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create account');
       throw error;
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    name: string,
+    signupToken?: string,
+    inviteCode?: string
+  ) => {
+    return completeSignup({ email, name, password, signupToken, inviteCode });
+  };
+
+  const signIn = async (email: string, password: string, inviteCode?: string) => {
     try {
-      const { user: signedIn } = await authApi.login({ email, password });
+      const { user: signedIn, joinedTeamId } = await authApi.login({
+        email,
+        password,
+        inviteCode,
+      });
       setUser(signedIn);
       toast.success('Welcome back!');
+      return { joinedTeamId };
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to sign in');
       throw error;
@@ -144,6 +202,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         loading,
+        sendSignupOtp,
+        verifySignupOtp,
+        completeSignup,
         signUp,
         signIn,
         signOut,

@@ -39,6 +39,7 @@ if (cookieSameSite !== 'lax' && cookieSameSite !== 'none') {
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   isProd: process.env.NODE_ENV === 'production',
+  isDev: (process.env.NODE_ENV ?? 'development') === 'development',
   isTest: process.env.NODE_ENV === 'test',
   port: Number(process.env.PORT ?? 4000),
   databaseUrl,

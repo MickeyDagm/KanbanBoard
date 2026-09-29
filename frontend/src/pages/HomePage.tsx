@@ -40,7 +40,7 @@ const HomePage: React.FC = () => {
       {boardsQuery.isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-[118px] bg-white rounded-xl border border-slate-200 animate-pulse" />
+            <div key={i} className="h-[118px] bg-slate-100 rounded-xl border border-slate-200/90 animate-pulse" />
           ))}
         </div>
       ) : boards.length === 0 ? (

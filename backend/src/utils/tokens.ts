@@ -18,6 +18,26 @@ export function verifyToken(token: string): { sub: string } {
   return { sub: payload.sub };
 }
 
+export function signSignupToken(email: string): string {
+  return jwt.sign(
+    { email: email.trim().toLowerCase(), purpose: 'signup_verified' },
+    env.jwtSecret,
+    { expiresIn: '30m' }
+  );
+}
+
+export function verifySignupToken(token: string): { email: string } {
+  const payload = jwt.verify(token, env.jwtSecret);
+  if (
+    typeof payload === 'string' ||
+    !payload.email ||
+    payload.purpose !== 'signup_verified'
+  ) {
+    throw new Error('Invalid or expired signup verification token');
+  }
+  return { email: payload.email as string };
+}
+
 export function setAuthCookie(res: Response, token: string): void {
   res.cookie(env.cookieName, token, {
     httpOnly: true,

@@ -22,10 +22,11 @@ export class ApiError extends Error {
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
+  timeoutMs?: number;
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body } = options;
+  const { method = 'GET', body, timeoutMs = 15000 } = options;
 
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -34,6 +35,9 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     headers['x-client-event-id'] = registerClientEventId();
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE}/api${path}`, {
@@ -41,9 +45,19 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       credentials: 'include',
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
   } catch {
+    if (controller.signal.aborted) {
+      throw new ApiError(
+        408,
+        'TIMEOUT',
+        'Request timed out. Please check your connection and try again.'
+      );
+    }
     throw new ApiError(0, 'NETWORK', 'Cannot reach the server. Is the backend running?');
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (response.status === 204) return undefined as T;

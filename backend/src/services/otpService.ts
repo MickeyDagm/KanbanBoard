@@ -2,9 +2,9 @@ import { randomInt, timingSafeEqual } from 'node:crypto';
 import { ApiError } from '../lib/errors.js';
 import { getCodeStore } from '../lib/codeStore.js';
 import { env } from '../config/env.js';
-import { sendOtpEmail } from './emailService.js';
+import { isEmailConfigured, sendOtpEmail } from './emailService.js';
 
-export type OtpPurpose = 'verify' | 'reset';
+export type OtpPurpose = 'verify' | 'reset' | 'signup';
 
 interface OtpRecord {
   code: string;
@@ -47,7 +47,7 @@ function matches(candidate: string, expected: string): boolean {
  * Throws when the per-email send budget is exhausted (429) or SMTP fails —
  * a failed send removes the code so a half-issued OTP never lingers.
  */
-export async function issueOtp(purpose: OtpPurpose, email: string, name: string): Promise<void> {
+export async function issueOtp(purpose: OtpPurpose, email: string, name = 'there'): Promise<void> {
   const store = getCodeStore();
   const sends = await store.incr(
     throttleKey(purpose, email),
@@ -65,6 +65,16 @@ export async function issueOtp(purpose: OtpPurpose, email: string, name: string)
   const otp: OtpRecord = { code: newCode(), expiresAt };
   await store.set(otpKey(purpose, email), JSON.stringify(otp), env.otp.ttlSeconds);
   await store.del(attemptsKey(purpose, email));
+
+  if (!isEmailConfigured()) {
+    if (env.isDev || env.isTest) {
+      console.log(`[AUTH OTP DEV] Purpose: ${purpose} | Email: ${email} | Code: ${otp.code}`);
+      return;
+    }
+    throw ApiError.serviceUnavailable(
+      'Email is not configured on this server. Set SMTP_HOST in backend/.env.'
+    );
+  }
 
   try {
     await sendOtpEmail({ to: normalize(email), name, code: otp.code, purpose });

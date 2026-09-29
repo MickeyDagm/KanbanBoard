@@ -18,7 +18,7 @@ const BoardsGrid: React.FC<BoardsGridProps> = ({ boards, canCreate, onCreate }) 
         <button
           key={board.id}
           onClick={() => navigate(`/boards/${board.id}`)}
-          className="text-left bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md
+          className="text-left bg-slate-100 rounded-xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-slate-300
                    transition-all overflow-hidden group focus:outline-none focus:ring-2 focus:ring-blue-500/40"
         >
           <div className="h-14" style={{ backgroundColor: board.background }} />
@@ -36,7 +36,7 @@ const BoardsGrid: React.FC<BoardsGridProps> = ({ boards, canCreate, onCreate }) 
       {canCreate && onCreate && (
         <button
           onClick={onCreate}
-          className="h-[118px] bg-white border-2 border-dashed border-slate-300 rounded-xl flex
+          className="h-[118px] bg-slate-100 border-2 border-dashed border-slate-300 rounded-xl flex
                    items-center justify-center gap-2 text-slate-500 hover:border-blue-400
                    hover:text-blue-600 hover:bg-blue-50/40 transition-all"
         >

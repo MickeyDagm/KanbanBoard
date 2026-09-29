@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import toast from 'react-hot-toast';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AuthForm from './AuthForm';
 import { AuthProvider } from '../contexts/AuthContext';
 import { authApi } from '../lib/api/authApi';
@@ -11,6 +13,8 @@ vi.mock('../lib/api/authApi', () => ({
   authApi: {
     me: vi.fn(),
     login: vi.fn(),
+    sendSignupOtp: vi.fn(),
+    verifySignupOtp: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
     verifyEmail: vi.fn(),
@@ -19,10 +23,12 @@ vi.mock('../lib/api/authApi', () => ({
     resetPassword: vi.fn(),
   },
 }));
+
 vi.mock('../lib/socket', () => ({
   connectSocket: vi.fn(),
   disconnectSocket: vi.fn(),
 }));
+
 vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
 }));
@@ -39,11 +45,19 @@ type MeResponse = Awaited<ReturnType<typeof authApi.me>>;
 type LoginResponse = Awaited<ReturnType<typeof authApi.login>>;
 type RegisterResponse = Awaited<ReturnType<typeof authApi.register>>;
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
+
 const renderForm = () =>
   render(
-    <AuthProvider>
-      <AuthForm />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthForm />
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 
 beforeEach(() => {
@@ -64,30 +78,73 @@ describe('AuthForm', () => {
       expect(authApi.login).toHaveBeenCalledWith({
         email: 'ada@example.com',
         password: 'password123',
+        inviteCode: undefined,
       })
     );
     expect(authApi.register).not.toHaveBeenCalled();
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Welcome back!'));
   });
 
-  it('switches to sign-up and submits to authApi.register', async () => {
+  it('completes the 1.1-1.6 signup flow: email -> OTP -> name & password confirmation -> DB creation', async () => {
+    vi.mocked(authApi.sendSignupOtp).mockResolvedValue({ ok: true, message: 'Code sent' });
+    vi.mocked(authApi.verifySignupOtp).mockResolvedValue({
+      ok: true,
+      signupToken: 'test-signup-token',
+    });
     vi.mocked(authApi.register).mockResolvedValue({ user: mockUser } as RegisterResponse);
+
     renderForm();
 
-    await userEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Ada Lovelace');
+    // 1.1: Click signup
+    await userEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+
+    // 1.2: Asked email
+    expect(screen.getByLabelText('Email Address')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Email Address'), 'ada@example.com');
-    await userEvent.type(screen.getByLabelText('Password'), 'password123');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
+
+    // 1.3: Clicks to send email with OTP
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with Email' }));
+    await waitFor(() =>
+      expect(authApi.sendSignupOtp).toHaveBeenCalledWith({ email: 'ada@example.com' })
+    );
+
+    // 1.4: Verify OTP step
+    const codeInput = await screen.findByLabelText('6-digit code');
+    expect(codeInput).toBeInTheDocument();
+    await userEvent.type(codeInput, '123456');
+    await userEvent.click(screen.getByRole('button', { name: 'Verify & Proceed' }));
+
+    await waitFor(() =>
+      expect(authApi.verifySignupOtp).toHaveBeenCalledWith({
+        email: 'ada@example.com',
+        code: '123456',
+      })
+    );
+
+    // 1.5: Asked name and password with confirmation
+    const nameInput = await screen.findByLabelText('Name');
+    const passwordInput = screen.getByLabelText('Password');
+    const confirmInput = screen.getByLabelText('Confirm Password');
+
+    await userEvent.type(nameInput, 'Ada Lovelace');
+    await userEvent.type(passwordInput, 'password123');
+    await userEvent.type(confirmInput, 'password123');
+
+    // 1.6: Submits to create user in DB and log in
+    const submitBtn = screen.getByRole('button', { name: 'Create Account & Sign In' });
+    expect(submitBtn).toBeEnabled();
+    await userEvent.click(submitBtn);
 
     await waitFor(() =>
       expect(authApi.register).toHaveBeenCalledWith({
         email: 'ada@example.com',
-        password: 'password123',
         name: 'Ada Lovelace',
+        password: 'password123',
+        signupToken: 'test-signup-token',
+        inviteCode: undefined,
       })
     );
-    expect(authApi.login).not.toHaveBeenCalled();
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Account created successfully!'));
   });
 
   it('disables the submit button while a request is in flight', async () => {
@@ -122,54 +179,6 @@ describe('AuthForm', () => {
     expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled();
   });
 
-  it('moves to the code step when sign-up needs email verification', async () => {
-    vi.mocked(authApi.register).mockResolvedValue({
-      user: mockUser,
-      requiresVerification: true,
-    } as RegisterResponse);
-    renderForm();
-
-    await userEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Ada Lovelace');
-    await userEvent.type(screen.getByLabelText('Email Address'), 'ada@example.com');
-    await userEvent.type(screen.getByLabelText('Password'), 'password123');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
-
-    await waitFor(() => expect(screen.getByText('Check your inbox')).toBeInTheDocument());
-    expect(screen.getByLabelText('6-digit code')).toBeInTheDocument();
-    expect(authApi.verifyEmail).not.toHaveBeenCalled();
-  });
-
-  it('submits the code to authApi.verifyEmail', async () => {
-    vi.mocked(authApi.register).mockResolvedValue({
-      user: mockUser,
-      requiresVerification: true,
-    } as RegisterResponse);
-    vi.mocked(authApi.verifyEmail).mockResolvedValue({ user: mockUser });
-    renderForm();
-
-    await userEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }));
-    await userEvent.type(screen.getByLabelText('Name'), 'Ada Lovelace');
-    await userEvent.type(screen.getByLabelText('Email Address'), 'ada@example.com');
-    await userEvent.type(screen.getByLabelText('Password'), 'password123');
-    await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
-
-    const codeInput = await screen.findByLabelText('6-digit code');
-    const verifyButton = screen.getByRole('button', { name: 'Verify & continue' });
-    expect(verifyButton).toBeDisabled();
-
-    await userEvent.type(codeInput, '123456');
-    expect(verifyButton).toBeEnabled();
-    await userEvent.click(verifyButton);
-
-    await waitFor(() =>
-      expect(authApi.verifyEmail).toHaveBeenCalledWith({
-        email: 'ada@example.com',
-        code: '123456',
-      })
-    );
-  });
-
   it('walks from forgot password to the new-password step', async () => {
     vi.mocked(authApi.forgotPassword).mockResolvedValue({ ok: true });
     vi.mocked(authApi.resetPassword).mockResolvedValue({ ok: true });
@@ -179,7 +188,9 @@ describe('AuthForm', () => {
     await userEvent.type(screen.getByLabelText('Email Address'), 'ada@example.com');
     await userEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
 
-    await waitFor(() => expect(screen.getByText('Choose a new password')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Set new password' })).toBeInTheDocument()
+    );
     expect(authApi.forgotPassword).toHaveBeenCalledWith({ email: 'ada@example.com' });
     await userEvent.type(screen.getByLabelText('6-digit code'), '654321');
     await userEvent.type(screen.getByLabelText('New password'), 'brandnewpass1');
@@ -192,6 +203,8 @@ describe('AuthForm', () => {
         password: 'brandnewpass1',
       })
     );
-    await waitFor(() => expect(screen.getByText('Welcome Back')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    );
   });
 });
