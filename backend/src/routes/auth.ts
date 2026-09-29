@@ -17,7 +17,7 @@ import {
 } from '../utils/tokens.js';
 import { pickAvatarColor } from '../utils/selects.js';
 import { env } from '../config/env.js';
-import { isEmailConfigured } from '../services/emailService.js';
+import { isEmailConfigured, sendOtpEmail } from '../services/emailService.js';
 import { issueOtp, verifyOtp, type OtpCheck } from '../services/otpService.js';
 import { inviteStatus } from './invites.js';
 import { emitTeamEvent } from '../realtime/socket.js';

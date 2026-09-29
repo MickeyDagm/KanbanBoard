@@ -60,6 +60,12 @@ export const env = {
   publicUrl: (process.env.PUBLIC_URL ?? clientOrigin).replace(/\/+$/, ''),
   appName: process.env.APP_NAME ?? 'Kanban',
 
+  /** Brevo API configuration */
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY ?? '',
+    fromEmail: process.env.BREVO_FROM_EMAIL ?? '',
+  },
+
   /** SMTP — leave SMTP_HOST empty to disable outbound email entirely. */
   smtp: {
     host: process.env.SMTP_HOST ?? '',

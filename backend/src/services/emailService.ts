@@ -1,12 +1,12 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { env } from '../config/env.js';
 
-/** Outbound email is off until SMTP_HOST is set in backend/.env. */
+/** Outbound email is configured if Brevo API key or SMTP_HOST is set. */
 export function isEmailConfigured(): boolean {
   // Tests never touch a real mail server; suites that need the "configured"
   // path mock this module instead.
   if (env.isTest) return false;
-  return Boolean(env.smtp.host);
+  return Boolean(process.env.BREVO_API_KEY || env.brevo.apiKey || env.smtp.host);
 }
 
 function fromAddress(): string {
@@ -104,13 +104,45 @@ function inviteHtml(input: InviteEmailInput): string {
 }
 
 /**
- * Sends an invite link by email. Throws when SMTP is not configured or the
- * transport fails — callers decide how to surface it.
+ * Sends an invite link by email. Uses Brevo API if configured, otherwise falls back to SMTP.
  */
 export async function sendInviteEmail(input: InviteEmailInput): Promise<void> {
   if (!isEmailConfigured()) {
-    throw new Error('SMTP is not configured (SMTP_HOST is empty)');
+    throw new Error('Email is not configured (neither BREVO_API_KEY nor SMTP_HOST is set)');
   }
+
+  const apiKey = process.env.BREVO_API_KEY || env.brevo.apiKey;
+  if (apiKey) {
+    const fromEmail = process.env.BREVO_FROM_EMAIL || env.brevo.fromEmail || env.smtp.from;
+    const fromName = env.appName || 'Kanban Board';
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: {
+          name: fromName,
+          email: fromEmail,
+        },
+        to: [{ email: input.to }],
+        subject: `${input.inviterName} invited you to ${input.teamName} on ${env.appName}`,
+        textContent: inviteText(input),
+        htmlContent: inviteHtml(input),
+      }),
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      console.error('Brevo invite email error:', response.status, details);
+      throw new Error('Could not send invitation email');
+    }
+    return;
+  }
+
   const sendTask = getTransporter().sendMail({
     from: fromAddress(),
     to: input.to,
@@ -183,22 +215,84 @@ function otpHtml({ name, code, purpose, to }: OtpEmailInput): string {
 </html>`;
 }
 
-/** Sends a one-time code (email verification / password reset / signup). */
-export async function sendOtpEmail(input: OtpEmailInput): Promise<void> {
-  if (!isEmailConfigured()) {
-    throw new Error('SMTP is not configured (SMTP_HOST is empty)');
+/**
+ * Sends a one-time verification / password reset code.
+ * Sends via Brevo's HTTP API (https://api.brevo.com/v3/smtp/email) when BREVO_API_KEY is configured,
+ * otherwise falls back to SMTP / Nodemailer.
+ */
+export async function sendOtpEmail(email: string, otp: string): Promise<any>;
+export async function sendOtpEmail(input: OtpEmailInput): Promise<any>;
+export async function sendOtpEmail(
+  emailOrInput: string | OtpEmailInput,
+  maybeOtp?: string
+): Promise<any> {
+  const isDirect = typeof emailOrInput === 'string';
+  const email = isDirect ? emailOrInput : emailOrInput.to;
+  const otp = isDirect ? (maybeOtp ?? '') : emailOrInput.code;
+  const name = isDirect ? 'there' : emailOrInput.name;
+  const purpose = isDirect ? 'verify' : emailOrInput.purpose;
+
+  const apiKey = process.env.BREVO_API_KEY || env.brevo.apiKey;
+
+  if (apiKey) {
+    const fromEmail = process.env.BREVO_FROM_EMAIL || env.brevo.fromEmail || env.smtp.from;
+    const fromName = 'Kanban Board';
+    const subject =
+      purpose === 'reset'
+        ? `${otp} is your ${env.appName} password reset code`
+        : 'Your Kanban verification code';
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: {
+          name: fromName,
+          email: fromEmail,
+        },
+        to: [{ email }],
+        subject,
+        textContent:
+          `Your verification code is ${otp}. ` +
+          'It expires in 5 minutes.',
+        htmlContent: otpHtml({ to: email, name, code: otp, purpose }),
+      }),
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+
+      console.error(
+        'Brevo email error:',
+        response.status,
+        details
+      );
+
+      throw new Error('Could not send verification email');
+    }
+
+    return response.json();
   }
+
+  if (!isEmailConfigured()) {
+    throw new Error('Email is not configured (neither BREVO_API_KEY nor SMTP_HOST is set)');
+  }
+
   const subject =
-    input.purpose === 'reset'
-      ? `${input.code} is your ${env.appName} password reset code`
-      : `${input.code} is your ${env.appName} verification code`;
+    purpose === 'reset'
+      ? `${otp} is your ${env.appName} password reset code`
+      : `${otp} is your ${env.appName} verification code`;
 
   const sendTask = getTransporter().sendMail({
     from: fromAddress(),
-    to: input.to,
+    to: email,
     subject,
-    text: otpText(input),
-    html: otpHtml(input),
+    text: otpText({ to: email, name, code: otp, purpose }),
+    html: otpHtml({ to: email, name, code: otp, purpose }),
   });
   const timeoutTask = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('Email server timed out after 9 seconds')), 9000)

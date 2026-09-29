@@ -47,7 +47,7 @@ function matches(candidate: string, expected: string): boolean {
  * Throws when the per-email send budget is exhausted (429) or SMTP fails —
  * a failed send removes the code so a half-issued OTP never lingers.
  */
-export async function issueOtp(purpose: OtpPurpose, email: string, name = 'there'): Promise<void> {
+export async function issueOtp(purpose: OtpPurpose, email: string, name = 'there'): Promise<string> {
   const store = getCodeStore();
   const sends = await store.incr(
     throttleKey(purpose, email),
@@ -69,10 +69,10 @@ export async function issueOtp(purpose: OtpPurpose, email: string, name = 'there
   if (!isEmailConfigured()) {
     if (env.isDev || env.isTest) {
       console.log(`[AUTH OTP DEV] Purpose: ${purpose} | Email: ${email} | Code: ${otp.code}`);
-      return;
+      return otp.code;
     }
     throw ApiError.serviceUnavailable(
-      'Email is not configured on this server. Set SMTP_HOST in backend/.env.'
+      'Email is not configured on this server. Set BREVO_API_KEY or SMTP_HOST in backend/.env.'
     );
   }
 
@@ -82,6 +82,8 @@ export async function issueOtp(purpose: OtpPurpose, email: string, name = 'there
     await store.del(otpKey(purpose, email));
     throw err;
   }
+
+  return otp.code;
 }
 
 export type OtpCheck =
